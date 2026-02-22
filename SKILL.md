@@ -41,10 +41,11 @@ What would you like to do?
 - **complete-implementation [name]** - Merge and clean up implementation
 
 **Canvas & Sync Commands:**
-- **sync-canvas** - Pull canvas changes to git planning files
-- **update-canvas** - Push git changes to canvas
+- **create-canvas [type]** - Create canvas (master, implementation, focus-group, community, all)
+- **sync-canvas [target]** - Sync canvas from git state (all, fg, master, impl, community)
+- **canvas-check** - Check canvas integrity and detect drift
+- **canvas-restore [key]** - Restore canvas from git state
 - **roadmap** - Show cross-focus-group roadmap in main channel
-- **create-canvas** - Create new canvas using Slack API (requires `exec` tool with OAuth token)
 
 **Migration Commands:**
 - **migrate [repo-path]** - Full GSD to WGSD migration wizard
@@ -82,9 +83,12 @@ Based on user input, route to appropriate workflow:
 | "promote concept", "implement concept" | workflows/promote-concept.md |
 | "create implementation", "start implementation" | workflows/create-implementation.md |
 | "list implementations", "show implementations" | workflows/list-implementations.md |
-| "sync canvas", "pull canvas" | workflows/sync-canvas.md |
-| "update canvas", "push canvas" | workflows/update-canvas.md |
-| "roadmap", "master roadmap", "status" | workflows/roadmap.md |
+| "create canvas", "setup canvas", "create-canvas" | workflows/canvas-create.md |
+| "sync canvas", "sync-canvas", "update canvas" | workflows/canvas-sync.md |
+| "canvas check", "canvas integrity", "check canvas" | workflows/canvas-enforce.md |
+| "canvas restore", "restore canvas" | workflows/canvas-enforce.md |
+| "canvas workflow", "canvas help" | workflows/canvas-enforce.md |
+| "roadmap", "master roadmap", "live roadmap" | workflows/canvas-sync.md (roadmap mode) |
 | "setup repo", "initialize", "setup" | workflows/setup-repo.md |
 | "create channel", "new channel" | workflows/create-channel.md |
 | "setup core channels", "create dev channel" | workflows/setup-core-channels.md |
