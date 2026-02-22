@@ -1,0 +1,434 @@
+---
+name: wgsd:lib:branch-ops
+description: Branch strategy enforcement library for WGSD workspaces
+---
+
+# Branch Operations Library
+
+Branch strategy enforcement and worktree management for WGSD workspaces.
+
+---
+
+## Branch Strategy
+
+### Branch Hierarchy
+
+```
+main/develop (primary)
+├── focus-groups/
+│   ├── security        ← Planning work (long-lived)
+│   ├── onboarding      ← Planning work (long-lived)
+│   └── billing         ← Planning work (long-lived)
+└── implementations/
+    ├── auth-v2         ← Code execution (short-lived)
+    └── payment-api     ← Code execution (short-lived)
+```
+
+### Branch Rules
+
+| Type | Base | Merge Target | Lifetime | Clean Required |
+|------|------|--------------|----------|----------------|
+| Primary | - | - | Permanent | Yes |
+| focus-groups/* | Primary | None | Long-lived | No |
+| implementations/* | Primary | Primary | 1-3 days | Yes |
+
+---
+
+## detect_primary_branch
+
+Detect the primary branch (develop preferred, falls back to main).
+
+```bash
+# Usage: detect_primary_branch
+# Returns: "develop" or "main" (stdout), or error
+detect_primary_branch() {
+  # Check for develop first (preferred for WGSD)
+  if git rev-parse --verify origin/develop >/dev/null 2>&1; then
+    echo "develop"
+    return 0
+  elif git rev-parse --verify origin/main >/dev/null 2>&1; then
+    echo "main"
+    return 0
+  elif git rev-parse --verify develop >/dev/null 2>&1; then
+    echo "develop"
+    return 0
+  elif git rev-parse --verify main >/dev/null 2>&1; then
+    echo "main"
+    return 0
+  else
+    echo "ERROR: No primary branch (main or develop) found"
+    return 1
+  fi
+}
+```
+
+---
+
+## ensure_clean_checkout
+
+Validate working directory is clean, optionally checkout specific branch.
+
+```bash
+# Usage: ensure_clean_checkout [branch]
+# Returns: 0 if clean, 1 if dirty (with list of dirty files)
+ensure_clean_checkout() {
+  local branch="${1:-}"
+  
+  # Check for uncommitted changes
+  local dirty_count=$(git status --porcelain 2>/dev/null | wc -l)
+  
+  if [ "$dirty_count" -gt 0 ]; then
+    echo "ERROR: Uncommitted changes detected ($dirty_count files)"
+    echo "DIRTY_FILES:"
+    git status --porcelain
+    echo ""
+    echo "ACTION_REQUIRED: Commit or stash changes before proceeding"
+    return 1
+  fi
+  
+  # Switch branch if specified
+  if [ -n "$branch" ]; then
+    local current=$(git branch --show-current 2>/dev/null)
+    if [ "$current" != "$branch" ]; then
+      git checkout "$branch" 2>&1
+      if [ $? -ne 0 ]; then
+        echo "ERROR: Failed to checkout $branch"
+        return 1
+      fi
+      echo "OK: Switched to $branch"
+    fi
+  fi
+  
+  echo "OK: Clean checkout on $(git branch --show-current)"
+  return 0
+}
+```
+
+---
+
+## create_focus_branch
+
+Create a focus group branch from primary.
+
+```bash
+# Usage: create_focus_branch <name>
+# Returns: 0 on success, 1 on error
+create_focus_branch() {
+  local name="$1"
+  
+  if [ -z "$name" ]; then
+    echo "ERROR: Focus branch name required"
+    return 1
+  fi
+  
+  local primary=$(detect_primary_branch)
+  if [ $? -ne 0 ]; then
+    echo "$primary"
+    return 1
+  fi
+  
+  local branch="focus-groups/$name"
+  
+  # Check if branch already exists
+  if git rev-parse --verify "$branch" >/dev/null 2>&1; then
+    echo "EXISTS: Branch $branch already exists"
+    return 0
+  fi
+  
+  # Check remote
+  if git rev-parse --verify "origin/$branch" >/dev/null 2>&1; then
+    # Checkout from remote
+    git checkout -b "$branch" "origin/$branch" 2>&1
+    if [ $? -eq 0 ]; then
+      echo "OK: Checked out existing remote branch $branch"
+      return 0
+    fi
+  fi
+  
+  # Create new branch from primary
+  git checkout "$primary" 2>/dev/null
+  git checkout -b "$branch" 2>&1
+  
+  if [ $? -eq 0 ]; then
+    echo "OK: Created branch $branch from $primary"
+    return 0
+  else
+    echo "ERROR: Failed to create branch $branch"
+    return 1
+  fi
+}
+```
+
+---
+
+## create_impl_branch
+
+Create an implementation branch from primary (requires clean state).
+
+```bash
+# Usage: create_impl_branch <name>
+# Returns: 0 on success, 1 on error
+create_impl_branch() {
+  local name="$1"
+  
+  if [ -z "$name" ]; then
+    echo "ERROR: Implementation branch name required"
+    return 1
+  fi
+  
+  local primary=$(detect_primary_branch)
+  if [ $? -ne 0 ]; then
+    echo "$primary"
+    return 1
+  fi
+  
+  # Ensure clean checkout first
+  local clean_result=$(ensure_clean_checkout "$primary")
+  if [ $? -ne 0 ]; then
+    echo "$clean_result"
+    return 1
+  fi
+  
+  local branch="implementations/$name"
+  
+  # Check if branch already exists
+  if git rev-parse --verify "$branch" >/dev/null 2>&1; then
+    echo "ERROR: Implementation branch $branch already exists"
+    echo "HINT: Implementation branches should be short-lived. Complete or remove the existing one."
+    return 1
+  fi
+  
+  # Create branch from primary
+  git checkout -b "$branch" "$primary" 2>&1
+  
+  if [ $? -eq 0 ]; then
+    echo "OK: Created implementation branch $branch from $primary"
+    return 0
+  else
+    echo "ERROR: Failed to create branch $branch"
+    return 1
+  fi
+}
+```
+
+---
+
+## setup_worktree
+
+Create a git worktree with validation.
+
+```bash
+# Usage: setup_worktree <path> <branch>
+# Returns: 0 on success, 1 on error
+setup_worktree() {
+  local path="$1"
+  local branch="$2"
+  
+  if [ -z "$path" ] || [ -z "$branch" ]; then
+    echo "ERROR: setup_worktree requires path and branch"
+    return 1
+  fi
+  
+  # Check if worktree already exists at path
+  if [ -d "$path" ]; then
+    # Check if it's a valid worktree
+    if [ -f "$path/.git" ]; then
+      echo "EXISTS: Worktree already exists at $path"
+      return 0
+    else
+      echo "ERROR: Directory exists but is not a worktree: $path"
+      return 1
+    fi
+  fi
+  
+  # Validate branch exists
+  if ! git rev-parse --verify "$branch" >/dev/null 2>&1; then
+    # Try to create the branch first if it doesn't exist
+    if echo "$branch" | grep -qE '^focus-groups/'; then
+      local fg_name=$(echo "$branch" | sed 's|focus-groups/||')
+      create_focus_branch "$fg_name"
+    elif echo "$branch" | grep -qE '^implementations/'; then
+      local impl_name=$(echo "$branch" | sed 's|implementations/||')
+      create_impl_branch "$impl_name"
+    else
+      echo "ERROR: Branch $branch does not exist"
+      return 1
+    fi
+  fi
+  
+  # Create parent directories
+  mkdir -p "$(dirname "$path")"
+  
+  # Create worktree
+  git worktree add "$path" "$branch" 2>&1
+  
+  if [ $? -eq 0 ]; then
+    echo "OK: Created worktree at $path for $branch"
+    return 0
+  else
+    echo "ERROR: Failed to create worktree"
+    return 1
+  fi
+}
+```
+
+---
+
+## remove_worktree
+
+Remove a git worktree safely.
+
+```bash
+# Usage: remove_worktree <path>
+# Returns: 0 on success, 1 on error
+remove_worktree() {
+  local path="$1"
+  
+  if [ -z "$path" ]; then
+    echo "ERROR: Worktree path required"
+    return 1
+  fi
+  
+  if [ ! -d "$path" ]; then
+    echo "WARNING: Worktree path does not exist: $path"
+    return 0
+  fi
+  
+  # Check for uncommitted changes in worktree
+  if [ -d "$path/.git" ] || [ -f "$path/.git" ]; then
+    cd "$path"
+    local dirty=$(git status --porcelain 2>/dev/null | wc -l)
+    cd - >/dev/null
+    
+    if [ "$dirty" -gt 0 ]; then
+      echo "ERROR: Worktree has uncommitted changes"
+      echo "HINT: Commit or stash changes before removing"
+      return 1
+    fi
+  fi
+  
+  git worktree remove "$path" --force 2>&1
+  
+  if [ $? -eq 0 ]; then
+    echo "OK: Removed worktree at $path"
+    return 0
+  else
+    echo "ERROR: Failed to remove worktree"
+    return 1
+  fi
+}
+```
+
+---
+
+## list_focus_branches
+
+List all focus group branches.
+
+```bash
+# Usage: list_focus_branches
+# Returns: List of focus group names (stdout)
+list_focus_branches() {
+  git branch -a 2>/dev/null | \
+    grep "focus-groups/" | \
+    sed 's|.*focus-groups/||' | \
+    sort -u
+}
+```
+
+---
+
+## list_impl_branches
+
+List all implementation branches.
+
+```bash
+# Usage: list_impl_branches
+# Returns: List of implementation names (stdout)
+list_impl_branches() {
+  git branch -a 2>/dev/null | \
+    grep "implementations/" | \
+    sed 's|.*implementations/||' | \
+    sort -u
+}
+```
+
+---
+
+## validate_branch_state
+
+Validate all branches are in good state.
+
+```bash
+# Usage: validate_branch_state
+# Returns: Status report (stdout)
+validate_branch_state() {
+  echo "🔍 Branch State Validation"
+  echo ""
+  
+  # Check primary branch
+  local primary=$(detect_primary_branch)
+  if [ $? -ne 0 ]; then
+    echo "❌ No primary branch found"
+    return 1
+  fi
+  echo "✅ Primary: $primary"
+  
+  # List focus branches
+  local focus_count=$(list_focus_branches | wc -l)
+  echo "📂 Focus Groups: $focus_count"
+  list_focus_branches | while read fg; do
+    echo "   - $fg"
+  done
+  
+  # List implementation branches
+  local impl_count=$(list_impl_branches | wc -l)
+  echo "🚀 Implementations: $impl_count"
+  list_impl_branches | while read impl; do
+    echo "   - $impl"
+  done
+  
+  # Check for stale implementations (branches older than 7 days)
+  echo ""
+  echo "⚠️  Warnings:"
+  local warnings=0
+  
+  if [ "$impl_count" -gt 4 ]; then
+    echo "   - Too many implementations ($impl_count > 4 recommended)"
+    warnings=$((warnings + 1))
+  fi
+  
+  if [ "$warnings" -eq 0 ]; then
+    echo "   None"
+  fi
+  
+  return 0
+}
+```
+
+---
+
+## Usage Example
+
+```bash
+# In a WGSD workflow:
+
+# Detect primary and ensure clean
+PRIMARY=$(detect_primary_branch)
+ensure_clean_checkout "$PRIMARY" || exit 1
+
+# Create focus group with worktree
+create_focus_branch "security"
+setup_worktree "./concepts/security" "focus-groups/security"
+
+# Create implementation (requires clean state)
+create_impl_branch "auth-v2"
+setup_worktree "./implementations/auth-v2" "implementations/auth-v2"
+
+# Validate overall state
+validate_branch_state
+```
+
+---
+
+*Library created for WGSD Phase 1*

@@ -1,17 +1,117 @@
 ---
 name: wgsd:create-channel
-description: Helper workflow to create Slack channels via exec tool and Slack API
+description: Helper workflow to create Slack channels via exec tool and Slack API with naming validation
 argument-hint: "[channel-name] [topic]"
 allowed-tools:
   - Exec
+  - AskUser
 ---
 
 <objective>
 Create a Slack channel using exec tool and Slack API with OpenClaw bot token.
 This is a helper workflow for other WGSD operations that need channel creation.
+
+**Naming Validation:** All channel names are validated against WGSD conventions before creation.
 </objective>
 
 <process>
+
+## Step 0: Validate Channel Name (WGSD Naming Convention)
+
+Before creating the channel, validate the name against WGSD conventions.
+
+See: `workflows/lib/naming.md` for full naming rules.
+
+```bash
+CHANNEL_NAME="{channel-name}"
+
+# Source naming library functions
+source_naming_lib() {
+  # Auto-correct function
+  auto_correct_name() {
+    echo "$1" | \
+      tr '[:upper:]' '[:lower:]' | \
+      tr '_' '-' | \
+      tr ' ' '-' | \
+      tr -cd 'a-z0-9-' | \
+      sed 's/--*/-/g' | \
+      sed 's/^-//' | \
+      sed 's/-$//' | \
+      cut -c1-30
+  }
+  
+  # Parse channel name
+  parse_channel_name() {
+    local channel=$(echo "$1" | sed 's/^#//')
+    
+    if echo "$channel" | grep -qE '^[a-z]+-fg-[a-z0-9-]+$'; then
+      echo "stub=$(echo "$channel" | sed 's/-fg-.*//')"
+      echo "type=fg"
+      echo "name=$(echo "$channel" | sed 's/^[a-z]*-fg-//')"
+      return 0
+    elif echo "$channel" | grep -qE '^[a-z]+-cpt-[a-z0-9-]+$'; then
+      echo "stub=$(echo "$channel" | sed 's/-cpt-.*//')"
+      echo "type=cpt"
+      echo "name=$(echo "$channel" | sed 's/^[a-z]*-cpt-//')"
+      return 0
+    elif echo "$channel" | grep -qE '^[a-z]+-impl-[a-z0-9-]+$'; then
+      echo "stub=$(echo "$channel" | sed 's/-impl-.*//')"
+      echo "type=impl"
+      echo "name=$(echo "$channel" | sed 's/^[a-z]*-impl-//')"
+      return 0
+    elif echo "$channel" | grep -qE '^[a-z]+-dev$'; then
+      echo "stub=$(echo "$channel" | sed 's/-dev$//')"
+      echo "type=dev"
+      return 0
+    elif echo "$channel" | grep -qE '^[a-z]+-community$'; then
+      echo "stub=$(echo "$channel" | sed 's/-community$//')"
+      echo "type=community"
+      return 0
+    else
+      return 1
+    fi
+  }
+}
+
+source_naming_lib
+
+# Check total length
+if [ ${#CHANNEL_NAME} -gt 80 ]; then
+  echo "❌ Channel name too long (${#CHANNEL_NAME} chars, max 80)"
+  exit 1
+fi
+
+# Try to parse the channel name
+PARSED=$(parse_channel_name "$CHANNEL_NAME" 2>/dev/null)
+PARSE_RESULT=$?
+
+if [ $PARSE_RESULT -ne 0 ]; then
+  # Name doesn't match WGSD pattern - attempt auto-correction
+  CORRECTED=$(auto_correct_name "$CHANNEL_NAME")
+  
+  echo "⚠️  Channel name '$CHANNEL_NAME' doesn't follow WGSD naming convention"
+  echo ""
+  echo "📋 WGSD Naming Rules:"
+  echo "   Pattern: {stub}-{type}[-{name}]"
+  echo "   Types: dev, community, fg, cpt, impl"
+  echo "   Examples: mvn-dev, mvn-fg-security, mvn-impl-auth-v2"
+  echo ""
+  
+  # If it looks like a partial name, suggest completion
+  if echo "$CORRECTED" | grep -qE '^[a-z0-9-]+$'; then
+    echo "💡 Suggestions:"
+    echo "   • For a focus group: <stub>-fg-$CORRECTED"
+    echo "   • For an implementation: <stub>-impl-$CORRECTED"
+    echo ""
+  fi
+  
+  echo "Please provide a valid WGSD channel name or bypass validation if intentional."
+  exit 1
+fi
+
+echo "✅ Channel name validated: $CHANNEL_NAME"
+echo "   $PARSED"
+```
 
 ## Step 1: Get Slack Token
 
