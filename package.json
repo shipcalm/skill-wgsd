@@ -1,0 +1,31 @@
+{
+  "name": "skill-wgsd",
+  "version": "0.1.0",
+  "description": "WGSD (We Get Shit Done) - Social collaborative development methodology skill for OpenClaw",
+  "main": "SKILL.md",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shipcalm/skill-wgsd.git"
+  },
+  "keywords": [
+    "openclaw",
+    "skill",
+    "development",
+    "collaboration",
+    "slack",
+    "canvas",
+    "gsd"
+  ],
+  "author": "ShipCalm",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/shipcalm/skill-wgsd/issues"
+  },
+  "homepage": "https://github.com/shipcalm/skill-wgsd#readme",
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
