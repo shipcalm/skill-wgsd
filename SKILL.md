@@ -87,6 +87,9 @@ Based on user input, route to appropriate workflow:
 | "roadmap", "master roadmap", "status" | workflows/roadmap.md |
 | "setup repo", "initialize", "setup" | workflows/setup-repo.md |
 | "create channel", "new channel" | workflows/create-channel.md |
+| "setup core channels", "create dev channel" | workflows/setup-core-channels.md |
+| "archive channel", "archive" | workflows/archive-channel.md |
+| "restore channel", "unarchive channel" | workflows/restore-channel.md |
 | "migrate", "migration", "migrate from gsd" | workflows/migrate.md |
 | "analyze", "analyze project", "migration readiness" | workflows/migrate.md (analysis mode) |
 | "init", "initialize workspace" | workflows/init.md |
