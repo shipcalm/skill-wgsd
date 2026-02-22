@@ -46,6 +46,10 @@ What would you like to do?
 - **roadmap** - Show cross-focus-group roadmap in main channel
 - **create-canvas** - Create new canvas using Slack API (requires `exec` tool with OAuth token)
 
+**Migration Commands:**
+- **migrate [repo-path]** - Full GSD to WGSD migration wizard
+- **analyze [repo-path]** - Analyze GSD project for migration readiness
+
 **Repository Commands:**
 - **status** - Show WGSD status across all focus groups and implementations
 - **setup-repo [repo-path]** - Initialize WGSD structure in repository
@@ -83,6 +87,10 @@ Based on user input, route to appropriate workflow:
 | "roadmap", "master roadmap", "status" | workflows/roadmap.md |
 | "setup repo", "initialize", "setup" | workflows/setup-repo.md |
 | "create channel", "new channel" | workflows/create-channel.md |
+| "migrate", "migration", "migrate from gsd" | workflows/migrate.md |
+| "analyze", "analyze project", "migration readiness" | workflows/migrate.md (analysis mode) |
+| "init", "initialize workspace" | workflows/init.md |
+| "workspace status", "wgsd status" | workflows/workspace-status.md |
 
 </routing>
 
