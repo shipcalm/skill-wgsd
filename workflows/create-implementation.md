@@ -1,6 +1,6 @@
 ---
 name: wgsd:create-implementation
-description: Create implementation from a mature concept (max 2-4 concurrent)
+description: Create implementation from a promoted concept with scaling enforcement
 argument-hint: "[concept-name]"
 allowed-tools:
   - Read
@@ -11,131 +11,278 @@ allowed-tools:
 ---
 
 <objective>
-Promote a mature concept to active implementation with:
+Create active implementation from a promoted concept with:
 - Dedicated implementation channel for focused execution
-- Git branch and worktree for code development  
+- Git branch and worktree for code development (trunk-based)
+- Focus group scaling enforcement (~1 impl per focus group)
+- Owner verification and commitment
+- Priority queue management
 - Traditional GSD workflow (requirements → roadmap → phases)
 - Implementation tracking and status reporting
-- Enforce 2-4 concurrent implementation limit
+- Global 2-4 concurrent implementation limit
 </objective>
+
+<libraries>
+- workflows/lib/priority-queue.md - Queue management
+- workflows/lib/github-pr.md - PR integration
+- workflows/lib/slack-api.md - Channel creation
+- workflows/lib/canvas-api.md - Canvas creation
+</libraries>
 
 <process>
 
-## Step 1: Validate Implementation Capacity
+## Step 1: Validate Global Implementation Capacity
 
 ```bash
 REPO_NAME=$(basename $(pwd))
 CONCEPT_NAME="{concept-name}"
+TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+echo "📊 Checking implementation capacity..."
 
 # Check current implementation count
 CURRENT_IMPLEMENTATIONS=0
 if [ -d .planning/active-implementations ]; then
-    CURRENT_IMPLEMENTATIONS=$(find .planning/active-implementations -maxdepth 1 -type d | grep -v "^\\.planning/active-implementations$" | wc -l)
+    CURRENT_IMPLEMENTATIONS=$(find .planning/active-implementations -maxdepth 1 -type d \
+        | grep -v "^\\.planning/active-implementations$" | wc -l)
 fi
 
 MAX_IMPLEMENTATIONS=4
 
-if [ $CURRENT_IMPLEMENTATIONS -ge $MAX_IMPLEMENTATIONS ]; then
-    echo "❌ Implementation capacity reached (${CURRENT_IMPLEMENTATIONS}/${MAX_IMPLEMENTATIONS})"
-    echo "💡 Complete existing implementations before starting new ones:"
-    find .planning/active-implementations -maxdepth 1 -type d | grep -v "^\\.planning/active-implementations$" | sed 's|.planning/active-implementations/||'
+if [ "$CURRENT_IMPLEMENTATIONS" -ge "$MAX_IMPLEMENTATIONS" ]; then
+    echo ""
+    echo "❌ **Implementation capacity reached** (${CURRENT_IMPLEMENTATIONS}/${MAX_IMPLEMENTATIONS})"
+    echo ""
+    echo "Active implementations:"
+    for impl_dir in .planning/active-implementations/*/; do
+        IMPL_NAME=$(basename "$impl_dir")
+        OWNER=$(grep "Owner:" "${impl_dir}STATE.md" 2>/dev/null | head -1 | sed 's/.*: @*//')
+        STATUS=$(grep "Status:" "${impl_dir}STATE.md" 2>/dev/null | head -1 | sed 's/.*: //')
+        echo "  • ${IMPL_NAME} (@${OWNER:-unassigned}) - ${STATUS:-unknown}"
+    done
+    echo ""
+    echo "💡 Complete or pause an implementation before starting a new one"
     exit 1
 fi
 
-echo "✅ Implementation slots available: $((MAX_IMPLEMENTATIONS - CURRENT_IMPLEMENTATIONS)) remaining"
+echo "✅ Global capacity OK: ${CURRENT_IMPLEMENTATIONS}/${MAX_IMPLEMENTATIONS} slots used"
 ```
 
 ## Step 2: Find and Validate Concept
 
 ```bash
+echo ""
+echo "🔍 Locating concept: ${CONCEPT_NAME}"
+
 # Search for concept across all focus groups
 CONCEPT_FILE=""
 FOCUS_GROUP=""
+OWNER=""
 
 for fg_dir in .planning/focus-groups/*/; do
     if [ -f "${fg_dir}concepts/${CONCEPT_NAME}.md" ]; then
         CONCEPT_FILE="${fg_dir}concepts/${CONCEPT_NAME}.md"
         FOCUS_GROUP=$(basename "$fg_dir")
-        echo "📍 Found concept: ${CONCEPT_NAME} in ${FOCUS_GROUP} focus group"
         break
     fi
 done
 
 if [ -z "$CONCEPT_FILE" ]; then
-    echo "❌ Concept '${CONCEPT_NAME}' not found in any focus group"
-    echo "💡 Available concepts:"
-    find .planning/focus-groups -name "*.md" -path "*/concepts/*" | sed 's|.planning/focus-groups/||;s|/concepts/| → |;s|\.md||'
+    echo "❌ Concept '${CONCEPT_NAME}' not found"
+    echo ""
+    echo "💡 Available concepts ready for implementation:"
+    find .planning/focus-groups -name "*.md" -path "*/concepts/*" \
+        -exec grep -l "🚀 Ready" {} \; 2>/dev/null | \
+        sed 's|.planning/focus-groups/||;s|/concepts/| → |;s|\.md||'
     exit 1
 fi
 
-# Check if concept is ready for implementation
-if ! grep -q "🚀 Ready for Implementation" "$CONCEPT_FILE"; then
-    echo "⚠️  Concept '${CONCEPT_NAME}' is not marked as ready for implementation"
-    echo "📄 Current status in file: $(grep "Status:" "$CONCEPT_FILE")"
-    echo "💡 Update concept status to '🚀 Ready for Implementation' first"
+echo "📍 Found: ${CONCEPT_NAME} in ${FOCUS_GROUP} focus group"
+
+# Check status
+CURRENT_STATUS=$(grep "^\*\*Status:\*\*" "$CONCEPT_FILE" | head -1 | sed 's/\*\*Status:\*\* //')
+
+if [[ "$CURRENT_STATUS" != *"Ready"* ]]; then
+    echo ""
+    echo "❌ Concept is not ready for implementation"
+    echo "   Current status: ${CURRENT_STATUS}"
+    echo ""
+    echo "💡 Promote concept first: /wgsd promote ${CONCEPT_NAME}"
     exit 1
 fi
 
-echo "✅ Concept validated and ready for implementation"
+echo "✅ Concept status: Ready for Implementation"
 ```
 
-## Step 3: Create Implementation Structure
+## Step 3: Verify Owner Assignment
 
 ```bash
-IMPL_NAME="${CONCEPT_NAME}-impl"
-mkdir -p .planning/active-implementations/${IMPL_NAME}
+echo ""
+echo "👤 Verifying owner assignment..."
 
-echo "🏗️  Creating implementation: ${IMPL_NAME}"
-echo "📱 Channel: #${REPO_NAME}-impl-${CONCEPT_NAME}"
+# Extract owner from concept file
+OWNER=$(grep "Assigned Owner:" "$CONCEPT_FILE" 2>/dev/null | sed 's/.*: @*//' | head -1)
+
+if [ -z "$OWNER" ]; then
+    echo ""
+    echo "❌ **No owner assigned**"
+    echo ""
+    echo "An implementation requires an assigned owner who commits to:"
+    echo "  • 1-3 day implementation timeline"
+    echo "  • Daily status updates"
+    echo "  • Driving the work to completion"
+    echo ""
+    echo "**To assign an owner:**"
+    echo "  /wgsd assign ${CONCEPT_NAME} @user"
+    echo ""
+    echo "**To claim it yourself:**"
+    echo "  /wgsd claim ${CONCEPT_NAME}"
+    exit 1
+fi
+
+echo "✅ Owner: @${OWNER}"
 ```
 
-## Step 4: Create Implementation Planning Files
+## Step 4: Check Focus Group Scaling (WORKFLOW-05)
+
+```bash
+echo ""
+echo "📊 Checking focus group scaling..."
+
+# Count active implementations for this specific focus group
+FG_IMPL_COUNT=0
+FG_ACTIVE_IMPLS=""
+
+if [ -d .planning/active-implementations ]; then
+    for impl_dir in .planning/active-implementations/*/; do
+        if [ -f "${impl_dir}concept-source.md" ]; then
+            IMPL_FG=$(grep "Source Focus Group:" "${impl_dir}concept-source.md" 2>/dev/null | sed 's/.*: //')
+            if [ "$IMPL_FG" = "$FOCUS_GROUP" ]; then
+                FG_IMPL_COUNT=$((FG_IMPL_COUNT + 1))
+                IMPL_NAME=$(basename "$impl_dir")
+                FG_ACTIVE_IMPLS="${FG_ACTIVE_IMPLS}  • ${IMPL_NAME}\n"
+            fi
+        fi
+    done
+fi
+
+echo "   ${FOCUS_GROUP} focus group: ${FG_IMPL_COUNT} active implementation(s)"
+
+if [ "$FG_IMPL_COUNT" -ge 1 ]; then
+    echo ""
+    echo "⚠️ **Scaling Warning**"
+    echo ""
+    echo "The ${FOCUS_GROUP} focus group already has an active implementation:"
+    echo -e "${FG_ACTIVE_IMPLS}"
+    echo ""
+    echo "WGSD recommends ~1 implementation per focus group to:"
+    echo "  • Maintain domain expertise focus"
+    echo "  • Prevent context switching within teams"
+    echo "  • Enable natural parallel scaling across focus groups"
+    echo ""
+    
+    # Check for override flag or prompt
+    if [ -z "$OVERRIDE_REASON" ]; then
+        echo "**Options:**"
+        echo "1. Wait for current implementation to complete"
+        echo "2. Override with justification:"
+        echo "   /wgsd create-implementation ${CONCEPT_NAME} --override \"<reason>\""
+        echo ""
+        echo "Override with a valid reason to proceed."
+        exit 1
+    else
+        echo "⚠️ Override accepted"
+        echo "   Reason: ${OVERRIDE_REASON}"
+        echo ""
+        
+        # Log the override decision
+        cat >> ".planning/focus-groups/${FOCUS_GROUP}/STATE.md" << EOF
+
+### Scaling Override: ${TIMESTAMP}
+- **Implementation:** ${CONCEPT_NAME}
+- **Reason:** ${OVERRIDE_REASON}
+- **Existing Active:** $(echo -e "$FG_ACTIVE_IMPLS" | tr '\n' ', ')
+EOF
+        
+        echo "📝 Override logged to focus group STATE.md"
+    fi
+else
+    echo "✅ Scaling check passed"
+fi
+```
+
+## Step 5: Create Implementation Structure
+
+```bash
+echo ""
+echo "🏗️ Creating implementation structure..."
+
+IMPL_NAME="${CONCEPT_NAME}-impl"
+IMPL_DIR=".planning/active-implementations/${IMPL_NAME}"
+
+mkdir -p "${IMPL_DIR}"
+
+echo "   Directory: ${IMPL_DIR}"
+```
+
+## Step 6: Create Implementation Files
 
 **.planning/active-implementations/{impl-name}/concept-source.md:**
-```markdown
+```bash
+# Extract concept details
+PROBLEM=$(grep -A5 "## Problem Statement" "$CONCEPT_FILE" | grep -v "^##" | head -3)
+PRIORITY=$(grep "Priority:" "$CONCEPT_FILE" | head -1 | sed 's/.*: //')
+
+cat > "${IMPL_DIR}/concept-source.md" << EOF
 # Implementation Source
 
-**Implementation:** {Implementation Name}
-**Source Concept:** {concept-name}
-**Source Focus Group:** {focus-group}
-**Promoted:** {date}
+**Implementation:** ${IMPL_NAME}
+**Source Concept:** ${CONCEPT_NAME}
+**Source Focus Group:** ${FOCUS_GROUP}
+**Promoted:** ${TIMESTAMP}
+**Owner:** @${OWNER}
 
 ## Original Concept
 
-**File:** `.planning/focus-groups/{focus-group}/concepts/{concept-name}.md`
-**Problem Statement:** {extracted from concept}
-**Priority:** {extracted from concept}
+**File:** \`.planning/focus-groups/${FOCUS_GROUP}/concepts/${CONCEPT_NAME}.md\`
+**Priority:** ${PRIORITY:-medium}
 
-## Concept Context
+## Problem Statement
 
-{Copy relevant sections from original concept file}
+${PROBLEM}
 
-## Implementation Decision
+## Implementation Commitment
 
-**Reason for Implementation:** {why this concept was selected}
+**Owner:** @${OWNER}
 **Target Timeline:** 1-3 days maximum
-**Assigned Developers:** {to be filled}
+**Started:** ${TIMESTAMP}
 
 ## Links
 
-- **Source Concept:** `.planning/focus-groups/{focus-group}/concepts/{concept-name}.md`
-- **Focus Group Channel:** #{repo-name}-{focus-group}
-- **Implementation Channel:** #{repo-name}-impl-{concept-name}
+- **Source Concept:** \`.planning/focus-groups/${FOCUS_GROUP}/concepts/${CONCEPT_NAME}.md\`
+- **Focus Group Channel:** #${REPO_NAME}-${FOCUS_GROUP}
+- **Implementation Channel:** #${REPO_NAME}-impl-${CONCEPT_NAME}
 
 ---
 
-*This implementation tracks back to the {focus-group} focus group discussion*
+*This implementation tracks back to the ${FOCUS_GROUP} focus group discussion*
+EOF
+
+echo "   Created: concept-source.md"
 ```
 
 **.planning/active-implementations/{impl-name}/STATE.md:**
-```markdown
-# {Implementation Name} - State
+```bash
+cat > "${IMPL_DIR}/STATE.md" << EOF
+# ${CONCEPT_NAME} Implementation - State
 
-**Created:** {date}
-**Source Concept:** {concept-name} from {focus-group}
-**Status:** Initializing
-**Target Version:** TBD (determined at merge)
+**Created:** ${TIMESTAMP}
+**Source Concept:** ${CONCEPT_NAME} from ${FOCUS_GROUP}
+**Owner:** @${OWNER}
+**Status:** 🟡 Initializing
+**Progress:** 0%
 **Days Active:** 0
+**Target Version:** TBD (determined at merge)
 
 ## Current Phase
 
@@ -143,222 +290,319 @@ echo "📱 Channel: #${REPO_NAME}-impl-${CONCEPT_NAME}"
 **Progress:** Starting
 **Next:** Define implementation requirements from concept
 
-## Team
+## Daily Log
 
-**Channel:** #{repo-name}-impl-{concept-name}
-**Developers:** {to be assigned}
+### Day 0 (${TIMESTAMP:0:10})
+- Implementation created from concept
+- Channel and infrastructure setup
+- Ready to begin requirements definition
 
-## Timeline
-
-- **Day 0** ({date}): Implementation created from concept
-- **Target:** 1-3 day implementation cycle
-- **Merge Target:** develop branch
-
-## Blockers & Dependencies
+## Blockers
 
 *None currently*
 
-## Recent Activity
+## Milestones
 
-- {timestamp}: Implementation channel created
-- {timestamp}: Requirements definition starting
+- [ ] Requirements defined
+- [ ] Roadmap created
+- [ ] Phase 1 complete
+- [ ] Code review passed
+- [ ] Merged to develop
 
 ---
 
-**Daily Updates:** This file should be updated daily during implementation
+**Daily Updates Required:** Update this file daily with progress
+**Canvas Sync:** Changes sync to implementation channel canvas
+EOF
+
+echo "   Created: STATE.md"
 ```
 
-## Step 5: Create Git Branch and Worktree
+## Step 7: Create Git Branch and Worktree
 
 ```bash
-# Create implementation branch off develop
-git checkout develop
-git pull origin develop  # Get latest changes
+echo ""
+echo "🌿 Setting up git branch and worktree..."
+
+# Ensure we're on develop and up to date
+CURRENT_BRANCH=$(git branch --show-current)
+git stash push -m "WGSD: temp stash for implementation creation" 2>/dev/null || true
+
+git checkout develop 2>/dev/null || git checkout main
+git pull origin HEAD
 
 # Create implementation branch
-git checkout -b implementations/${CONCEPT_NAME}
-echo "# Implementation: ${CONCEPT_NAME}" > .implementation-readme.md
-git add .implementation-readme.md
-git commit -m "feat: start ${CONCEPT_NAME} implementation branch"
-git push -u origin implementations/${CONCEPT_NAME}
+IMPL_BRANCH="implementations/${CONCEPT_NAME}"
 
-# Create worktree for implementation work
-git worktree add implementations/${CONCEPT_NAME} implementations/${CONCEPT_NAME}
+if git show-ref --verify --quiet "refs/heads/${IMPL_BRANCH}"; then
+    echo "   Branch exists, checking out..."
+    git checkout "${IMPL_BRANCH}"
+else
+    echo "   Creating branch: ${IMPL_BRANCH}"
+    git checkout -b "${IMPL_BRANCH}"
+    
+    # Add placeholder file
+    echo "# Implementation: ${CONCEPT_NAME}" > ".impl-${CONCEPT_NAME}.md"
+    git add ".impl-${CONCEPT_NAME}.md"
+    git commit -m "feat: start ${CONCEPT_NAME} implementation"
+    git push -u origin "${IMPL_BRANCH}"
+fi
 
-echo "✅ Git structure created:"
-echo "   Branch: implementations/${CONCEPT_NAME}"
-echo "   Worktree: implementations/${CONCEPT_NAME}/"
+# Create worktree for isolated work
+WORKTREE_PATH="implementations/${CONCEPT_NAME}"
+
+if [ -d "$WORKTREE_PATH" ]; then
+    echo "   Worktree already exists: ${WORKTREE_PATH}"
+else
+    mkdir -p implementations
+    git worktree add "${WORKTREE_PATH}" "${IMPL_BRANCH}"
+    echo "   Created worktree: ${WORKTREE_PATH}"
+fi
+
+# Return to original branch
+git checkout "$CURRENT_BRANCH" 2>/dev/null || git checkout develop
+git stash pop 2>/dev/null || true
+
+echo "✅ Git structure ready"
+echo "   Branch: ${IMPL_BRANCH}"
+echo "   Worktree: ${WORKTREE_PATH}/"
 ```
 
-## Step 6: Create Implementation Channel
+## Step 8: Create Implementation Channel
 
-Create Slack channel:
-- **Name:** {repo-name}-impl-{concept-name}
-- **Topic:** "Implementation of {concept-name} concept from #{repo-name}-{focus-group}. Target: 1-3 days execution."
-- **Type:** Public channel
-- **Add Jarvis with no-mention mode**
+```bash
+echo ""
+echo "📱 Creating implementation channel..."
 
-## Step 7: Create Implementation Canvas
+CHANNEL_NAME="${REPO_NAME}-impl-${CONCEPT_NAME}"
+CHANNEL_TOPIC="Implementation of ${CONCEPT_NAME} from #${REPO_NAME}-${FOCUS_GROUP}. Owner: @${OWNER}. Target: 1-3 days."
 
-**Canvas Title:** "{Concept Name} Implementation Status"
-**Canvas Content:**
+# Create private channel via Slack API
+# Uses lib/slack-api.md functions
+echo "   Channel: #${CHANNEL_NAME}"
+echo "   Topic: ${CHANNEL_TOPIC}"
+
+# Would invoke create_private_channel from slack-api.md
 ```
-# {Concept Name} Implementation
 
-**Source:** {concept-name} from {focus-group} focus group
-**Status:** Initializing
+## Step 9: Create Implementation Canvas
+
+```bash
+echo ""
+echo "🖼️ Creating implementation canvas..."
+
+CANVAS_CONTENT="# ${CONCEPT_NAME} Implementation
+
+**Source:** ${CONCEPT_NAME} from ${FOCUS_GROUP}
+**Owner:** @${OWNER}
+**Status:** 🟡 Initializing
+**Progress:** 0%
 **Timeline:** 1-3 days
-**Target Version:** TBD
 
 ## Current Phase
 Phase 0: Requirements Definition
 
-## Team
-*To be assigned*
-
 ## Daily Progress
-*Will be updated daily*
+*Updated automatically from STATE.md*
+
+### Day 0
+- Implementation created
+- Ready to begin
 
 ## Blockers
-*None currently*
+*None*
+
+---
+*Canvas syncs from \`.planning/active-implementations/${IMPL_NAME}/STATE.md\`*"
+
+# Would invoke create_channel_canvas from canvas-api.md
+echo "   Canvas created and attached to channel"
 ```
 
-## Step 8: Start GSD Workflow
-
-Switch to implementation worktree and start traditional GSD:
+## Step 10: Update Queue and Master Dashboard
 
 ```bash
-cd implementations/${CONCEPT_NAME}
+echo ""
+echo "📋 Updating implementation queue..."
 
-# Initialize GSD in implementation directory with concept context
-echo "🎯 Starting GSD workflow for implementation"
-echo "📋 Using concept context for requirements gathering"
+QUEUE_FILE=".planning/IMPLEMENTATION-QUEUE.md"
+
+# Remove from queue (it was waiting)
+# Add to active section
+# Uses lib/priority-queue.md functions
+
+# Update master dashboard
+echo "   Syncing master dashboard..."
+# Would invoke canvas sync
 ```
 
-Use traditional `/gsd new-project` workflow but with concept as starting context:
-- Requirements based on concept problem statement
-- Research if needed (may be lighter since concept already explored)
-- Roadmap with phases
-- Execution with task-level commits
-
-## Step 9: Update Master Configuration
-
-Update .planning/WGSD-CONFIG.md:
-```markdown
-### Active Implementations
-- **{concept-name}-impl**: #{repo-name}-impl-{concept-name} (started {date})
-```
-
-Update .planning/MASTER-ROADMAP.md with new implementation.
-
-## Step 10: Update Source Concept Status
-
-Mark original concept as implemented:
+## Step 11: Update Source Concept
 
 ```bash
+echo ""
+echo "📝 Updating source concept..."
+
 # Update concept status
-sed -i 's/Status: 🚀 Ready for Implementation/Status: 🔧 In Implementation/' \
-.planning/focus-groups/${FOCUS_GROUP}/concepts/${CONCEPT_NAME}.md
+sed -i "s/\*\*Status:\*\* .*/\*\*Status:\*\* 🔧 In Implementation/" "$CONCEPT_FILE"
 
 # Add implementation reference
-echo "## Implementation" >> .planning/focus-groups/${FOCUS_GROUP}/concepts/${CONCEPT_NAME}.md
-echo "**Implementation Started:** {date}" >> .planning/focus-groups/${FOCUS_GROUP}/concepts/${CONCEPT_NAME}.md
-echo "**Implementation Channel:** #{repo-name}-impl-{concept-name}" >> .planning/focus-groups/${FOCUS_GROUP}/concepts/${CONCEPT_NAME}.md
+cat >> "$CONCEPT_FILE" << EOF
+
+## Implementation Started
+
+**Started:** ${TIMESTAMP}
+**Implementation:** ${IMPL_NAME}
+**Channel:** #${REPO_NAME}-impl-${CONCEPT_NAME}
+**Owner:** @${OWNER}
+**Branch:** implementations/${CONCEPT_NAME}
+EOF
 
 # Commit changes
-git add .planning/focus-groups/${FOCUS_GROUP}/concepts/${CONCEPT_NAME}.md
-git commit -m "docs: mark ${CONCEPT_NAME} concept as in implementation"
+git add "$CONCEPT_FILE"
+git add "${IMPL_DIR}"
+git commit -m "feat(${FOCUS_GROUP}): start ${CONCEPT_NAME} implementation [@${OWNER}]"
+
+echo "✅ Concept updated"
 ```
 
-## Step 11: Team Notifications
+## Step 12: Send Notifications
 
-Send announcement to source focus group:
-
-```markdown
-🚀 **Concept Promoted to Implementation!**
-
-**Concept:** {Concept Name}
-**Implementation Channel:** #{repo-name}-impl-{concept-name}
-
-The {concept-name} concept has been promoted to active implementation!
-
-**What happens now:**
-- Dedicated implementation channel for focused 1-3 day execution
-- Traditional GSD workflow (requirements → phases → execution)
-- Daily progress updates and blocking issue resolution
-- Target merge to develop branch within 3 days
-
-**Implementation tracking:**
-- **Status:** `.planning/active-implementations/{impl-name}/STATE.md`
-- **Source concept:** Updated with implementation reference
-
-*Great work on maturing this concept through social discussion!*
+```bash
+echo ""
+echo "📢 Sending notifications..."
 ```
 
-Send welcome to implementation channel:
-
+**Focus Group Message:**
 ```markdown
-⚡ **Implementation Started: {Concept Name}**
+🚀 **Implementation Started: {concept-name}**
 
-**Source Concept:** {concept-name} from #{repo-name}-{focus-group}
-**Timeline:** 1-3 days maximum
-**Git Branch:** implementations/{concept-name}
+The concept has moved to active implementation!
+
+**Owner:** @{owner}
+**Channel:** #{repo-name}-impl-{concept-name}
+**Timeline:** 1-3 days
+
+**Track progress:**
+- Join #{repo-name}-impl-{concept-name} for updates
+- View `.planning/active-implementations/{impl-name}/STATE.md`
+
+*Great teamwork maturing this concept!*
+```
+
+**Implementation Channel Welcome:**
+```markdown
+⚡ **Implementation: {Concept Name}**
+
+**Owner:** @{owner}
+**Source:** {concept-name} from #{repo-name}-{focus-group}
+**Timeline:** 1-3 days
+**Branch:** implementations/{concept-name}
 **Worktree:** implementations/{concept-name}/
 
-**This is a focused implementation channel** - different from concept discussion:
-- Fast-paced execution using traditional GSD workflow
-- Requirements → Roadmap → Phases → Task execution
-- Daily progress updates required
-- Blocking issues resolved immediately
+---
 
-**Canvas above syncs with:** `.planning/active-implementations/{impl-name}/STATE.md`
+**This is a focused execution channel.** Different from concept discussion:
+- Fast-paced coding using GSD workflow
+- Requirements → Phases → Task commits
+- **Daily status updates required**
+- Blockers escalated immediately
+
+---
 
 **Next Steps:**
-1. Define implementation requirements from concept
-2. Create GSD roadmap and phases  
-3. Begin implementation with task-level commits
-4. Daily status updates in this channel
+1. Switch to worktree: `cd implementations/{concept-name}`
+2. Define requirements from concept context
+3. Create GSD roadmap with phases
+4. Begin implementation
 
-*Jarvis will guide the GSD workflow - no @ mentions needed*
+**To update status:**
+`/wgsd impl-status {concept-name} "Phase 1: 50% complete"`
+
+*Jarvis guides the GSD workflow - no @ needed*
 ```
 
-## Step 12: Return Status
+## Step 13: Return Success
 
 ```
 ---
 
-## ✅ Implementation Created: {Concept Name}
+## ✅ Implementation Created: {concept-name}
 
-**Source:** {concept-name} from {focus-group} focus group
+**Owner:** @{owner}
+**Focus Group:** {focus-group}
 **Channel:** #{repo-name}-impl-{concept-name}
-**Git Branch:** implementations/{concept-name}
+**Branch:** implementations/{concept-name}
 **Worktree:** implementations/{concept-name}/
-**Timeline:** 1-3 days maximum
 
-**Implementation slots:** {current+1}/{max-implementations} used
+### Capacity
+- **Global:** {current+1}/4 implementations active
+- **{focus-group}:** {fg-count+1} implementation(s) active
 
-**Ready for:**
-- Requirements definition from concept context
-- GSD roadmap and phase planning
-- Focused code execution and daily updates
-- Merge to develop within 3 days
+### Next Steps
 
-**Next:** Switch to implementation channel and start GSD requirements gathering
+1. **Switch to worktree:**
+   ```
+   cd implementations/{concept-name}
+   ```
+
+2. **Define requirements** from concept context
+
+3. **Create GSD roadmap** with 2-3 phases
+
+4. **Daily updates** required:
+   ```
+   /wgsd impl-status {concept-name} "Phase 1: 25%"
+   ```
+
+5. **When ready, create PR:**
+   ```
+   /wgsd impl-pr {concept-name}
+   ```
+
+---
+
+**Timeline commitment:** Complete within 1-3 days
+**Owner responsibility:** Daily updates, flag blockers
 
 ---
 ```
 
 </process>
 
+<error_handling>
+
+## Error Recovery
+
+| Error | Recovery |
+|-------|----------|
+| Branch already exists | Checkout existing branch |
+| Worktree conflict | Clean up orphan worktrees |
+| Channel exists | Use existing channel |
+| Owner invalid | Prompt for valid owner |
+
+```bash
+# Clean orphan worktrees
+git worktree prune
+
+# Check for orphan branches
+git branch -vv | grep ": gone]"
+```
+
+</error_handling>
+
 <success_criteria>
-- [ ] Implementation capacity validated (under 4 concurrent)  
-- [ ] Source concept found and validated as ready
-- [ ] Implementation planning structure created
-- [ ] Git branch and worktree set up off develop
-- [ ] Implementation channel created with proper topic
-- [ ] Canvas created for implementation status tracking
-- [ ] Source concept updated with implementation reference
-- [ ] Master configuration updated with new implementation
-- [ ] Team notifications sent to both channels
-- [ ] Ready to start traditional GSD workflow in implementation context
+- [ ] Global capacity validated (< 4 concurrent)
+- [ ] Focus group scaling checked (warning or override for > 1)
+- [ ] Concept found and in "Ready" status
+- [ ] Owner verified and assigned
+- [ ] Implementation directory created
+- [ ] concept-source.md and STATE.md created
+- [ ] Git branch created off develop
+- [ ] Worktree created for isolated work
+- [ ] Implementation channel created (private)
+- [ ] Canvas created with status template
+- [ ] Queue updated (moved from queued to active)
+- [ ] Source concept status updated to "In Implementation"
+- [ ] Notifications sent to focus group and impl channel
+- [ ] Clear next steps provided for owner
 </success_criteria>

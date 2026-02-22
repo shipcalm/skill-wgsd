@@ -56,6 +56,25 @@ What would you like to do?
 - **setup-repo [repo-path]** - Initialize WGSD structure in repository
 - **create-channel [name] [topic]** - Create Slack channel via exec tool and API
 
+**Workflow Engine Commands:**
+- **concept-development [concept]** - Work on concept via planning PRs
+- **implementation-workflow [impl] [action]** - Manage implementation lifecycle
+- **implementation-status [impl|all]** - Show implementation progress
+- **approve [concept]** - Vote to approve concept for implementation
+
+**Community Commands:**
+- **collect [message-link]** - Collect community feedback for triage
+- **triage** - Show pending feedback triage queue
+- **move-to-focus-group [id] [fg]** - Move feedback to focus group as concept
+- **invite-contributor [@user] [fg]** - Invite community member to focus group
+- **request-access [focus-group]** - Request access to a focus group
+- **approve-access [id]** - Approve access request
+- **deny-access [id] [reason]** - Deny access request
+- **community-status** - Show community engagement statistics
+- **update-community-canvas** - Refresh community roadmap canvas
+- **attribute [@user] [concept] [desc]** - Add contributor attribution
+- **publish [type] [message]** - Publish progress update to community
+
 **Usage Examples:**
 - `/wgsd create-focus-group security` - Create #mvn-security channel and structure
 - `/wgsd create-concept byof-filesystem` - Create concept within focus group
@@ -98,6 +117,21 @@ Based on user input, route to appropriate workflow:
 | "analyze", "analyze project", "migration readiness" | workflows/migrate.md (analysis mode) |
 | "init", "initialize workspace" | workflows/init.md |
 | "workspace status", "wgsd status" | workflows/workspace-status.md |
+| "concept pr", "planning pr", "concept development" | workflows/concept-development.md |
+| "implementation pr", "code pr", "impl workflow" | workflows/implementation-workflow.md |
+| "implementation status", "impl status" | workflows/implementation-status.md |
+| "approve", "vote", "approval" | workflows/promote-concept.md |
+| "collect feedback", "record feedback" | workflows/moderate-feedback.md |
+| "triage", "triage queue" | workflows/moderate-feedback.md |
+| "move to focus group", "move-to-focus-group" | workflows/moderate-feedback.md |
+| "invite contributor", "invite-contributor" | workflows/invite-contributor.md |
+| "request access", "request-access" | workflows/access-request.md |
+| "approve access", "approve-access" | workflows/access-request.md |
+| "deny access", "deny-access" | workflows/access-request.md |
+| "community status", "community-status" | workflows/community-visibility.md |
+| "update community canvas", "community canvas" | workflows/community-visibility.md |
+| "attribute", "attribution" | workflows/community-visibility.md |
+| "publish update", "progress update" | workflows/community-visibility.md |
 
 </routing>
 
