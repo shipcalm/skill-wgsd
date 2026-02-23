@@ -736,4 +736,359 @@ impact_summary "concepts/oauth-integration/impact-matrix.md"
 
 ---
 
-*Library created for WGSD Phase 11 - Cross-Cutting Impact System*
+## Approval Matrix Functions
+
+### approval_matrix_get
+
+Get complete approval matrix state for a concept.
+
+```bash
+# Usage: approval_matrix_get <impact_matrix_path>
+# Returns: JSON object with matrix state summary
+approval_matrix_get() {
+  local file_path="$1"
+  
+  local impacts=$(impact_parse_file "$file_path")
+  local metadata=$(impact_get_metadata "$file_path")
+  
+  if [ $? -ne 0 ]; then
+    echo '{"error": "Could not parse impact matrix"}'
+    return 1
+  fi
+  
+  python3 -c "
+import json
+from datetime import datetime
+
+impacts = json.loads('''$impacts''')
+metadata = json.loads('''$metadata''')
+
+# Count by status
+approved = [i for i in impacts if i.get('status') == 'approved']
+pending = [i for i in impacts if i.get('status') == 'pending']
+rejected = [i for i in impacts if i.get('status') == 'rejected']
+blocked = [i for i in impacts if i.get('status') == 'blocked']
+
+# Get blocking focus groups (FGs that are blocking others)
+blocking_fgs = set()
+for i in impacts:
+    if i.get('blocked_by'):
+        blocking_fgs.add(i['blocked_by'])
+
+# Get overridden impacts
+overridden = [i for i in impacts if i.get('overridden', False)]
+
+# Check if fully approved
+fully_approved = (
+    len(approved) == len(impacts) and
+    len(rejected) == 0 and
+    len(blocked) == 0
+)
+
+# Calculate completion percentage
+completion_pct = (len(approved) / len(impacts) * 100) if impacts else 0
+
+result = {
+    'concept': metadata.get('concept', 'unknown'),
+    'total_approvals': len(impacts),
+    'approved': len(approved),
+    'pending': len(pending),
+    'rejected': len(rejected),
+    'blocked': len(blocked),
+    'overridden': len(overridden),
+    'completion_percent': round(completion_pct, 1),
+    'fully_approved': fully_approved,
+    'blocking_fgs': list(blocking_fgs),
+    'details': impacts
+}
+
+print(json.dumps(result, indent=2))
+"
+  return 0
+}
+```
+
+---
+
+### approval_matrix_calculate_sla
+
+Calculate SLA deadline based on priority and start date.
+
+```bash
+# Usage: approval_matrix_calculate_sla <priority> <start_date>
+# Arguments:
+#   priority   - P0, P1, P2, or P3
+#   start_date - ISO date string (default: now)
+# Returns: ISO timestamp of deadline
+approval_matrix_calculate_sla() {
+  local priority="$1"
+  local start_date="${2:-$(date -u +"%Y-%m-%dT%H:%M:%SZ")}"
+  
+  python3 -c "
+from datetime import datetime, timedelta
+
+priority = '$priority'
+start_str = '$start_date'
+
+# SLA hours by priority
+sla_hours = {
+    'P0': 4,
+    'P1': 24,
+    'P2': 72,
+    'P3': 168  # 7 days
+}
+
+hours = sla_hours.get(priority, 72)  # Default to P2
+
+# Parse start date
+try:
+    if 'T' in start_str:
+        start = datetime.fromisoformat(start_str.replace('Z', '+00:00'))
+    else:
+        start = datetime.fromisoformat(start_str)
+except:
+    start = datetime.utcnow()
+
+deadline = start + timedelta(hours=hours)
+print(deadline.strftime('%Y-%m-%dT%H:%M:%SZ'))
+"
+  return 0
+}
+```
+
+---
+
+### approval_matrix_check_sla
+
+Check SLA status for all impacts in a concept.
+
+```bash
+# Usage: approval_matrix_check_sla <impact_matrix_path>
+# Returns: JSON object with SLA status by focus group
+approval_matrix_check_sla() {
+  local file_path="$1"
+  
+  local impacts=$(impact_parse_file "$file_path")
+  
+  if [ $? -ne 0 ]; then
+    echo '{"error": "Could not parse impact matrix"}'
+    return 1
+  fi
+  
+  python3 -c "
+import json
+from datetime import datetime, timezone
+
+impacts = json.loads('''$impacts''')
+now = datetime.now(timezone.utc)
+
+result = {
+    'overdue': [],
+    'approaching': [],  # Within 25% of deadline
+    'ok': [],
+    'no_sla': [],
+    'approved': []
+}
+
+for impact in impacts:
+    fg = impact.get('focus_group', '?')
+    status = impact.get('status', 'pending')
+    sla_str = impact.get('sla_deadline')
+    
+    if status == 'approved':
+        result['approved'].append(fg)
+        continue
+    
+    if not sla_str:
+        result['no_sla'].append(fg)
+        continue
+    
+    try:
+        deadline = datetime.fromisoformat(sla_str.replace('Z', '+00:00'))
+        
+        if now > deadline:
+            result['overdue'].append({
+                'focus_group': fg,
+                'deadline': sla_str,
+                'overdue_by': str(now - deadline)
+            })
+        else:
+            remaining = deadline - now
+            total_window = remaining.total_seconds()
+            
+            # If less than 25% time remaining
+            sla_hours = {'P0': 4, 'P1': 24, 'P2': 72, 'P3': 168}
+            priority = impact.get('priority', 'P2')
+            total_hours = sla_hours.get(priority, 72) * 3600
+            
+            if total_window < (total_hours * 0.25):
+                remaining_hours = round(remaining.total_seconds() / 3600, 1)
+                result['approaching'].append({
+                    'focus_group': fg,
+                    'deadline': sla_str,
+                    'remaining_hours': remaining_hours
+                })
+            else:
+                result['ok'].append(fg)
+    except Exception as e:
+        result['no_sla'].append(fg)
+
+print(json.dumps(result, indent=2))
+"
+  return 0
+}
+```
+
+---
+
+### approval_matrix_get_blockers
+
+Get all blocking issues preventing concept completion.
+
+```bash
+# Usage: approval_matrix_get_blockers <impact_matrix_path>
+# Returns: JSON array of blocking issues
+approval_matrix_get_blockers() {
+  local file_path="$1"
+  
+  local impacts=$(impact_parse_file "$file_path")
+  
+  if [ $? -ne 0 ]; then
+    echo '[]'
+    return 1
+  fi
+  
+  python3 -c "
+import json
+
+impacts = json.loads('''$impacts''')
+
+blockers = []
+
+for impact in impacts:
+    fg = impact.get('focus_group', '?')
+    status = impact.get('status', 'pending')
+    
+    if status == 'approved':
+        continue
+    
+    blocker = {
+        'focus_group': fg,
+        'status': status,
+        'priority': impact.get('priority', '?')
+    }
+    
+    if status == 'pending':
+        blocker['reason'] = 'Awaiting review'
+    elif status == 'rejected':
+        blocker['reason'] = f'Rejected: {impact.get(\"approval_comment\", \"No reason given\")}'
+    elif status == 'blocked':
+        blocker['reason'] = f'Blocked by {impact.get(\"blocked_by\", \"unknown\")}'
+        blocker['blocked_by'] = impact.get('blocked_by')
+        blocker['blocked_reason'] = impact.get('blocked_reason')
+    
+    blockers.append(blocker)
+
+print(json.dumps(blockers, indent=2))
+"
+  return 0
+}
+```
+
+---
+
+### approval_matrix_is_complete
+
+Check if concept approval is complete (all required approvals received).
+
+```bash
+# Usage: approval_matrix_is_complete <impact_matrix_path>
+# Returns: "true" or "false" with exit code 0/1
+approval_matrix_is_complete() {
+  local file_path="$1"
+  
+  local matrix=$(approval_matrix_get "$file_path")
+  
+  if [ $? -ne 0 ]; then
+    echo "false"
+    return 1
+  fi
+  
+  local fully_approved=$(echo "$matrix" | jq -r '.fully_approved')
+  
+  if [ "$fully_approved" = "true" ]; then
+    echo "true"
+    return 0
+  else
+    echo "false"
+    return 1
+  fi
+}
+```
+
+---
+
+### approval_matrix_set_sla
+
+Set SLA deadline for a focus group's impact.
+
+```bash
+# Usage: approval_matrix_set_sla <impact_matrix_path> <focus_group>
+# Sets SLA based on priority, starting from now
+approval_matrix_set_sla() {
+  local file_path="$1"
+  local focus_group="$2"
+  
+  # Get priority for focus group
+  local impacts=$(impact_parse_file "$file_path")
+  local priority=$(echo "$impacts" | jq -r --arg fg "$focus_group" '.[] | select(.focus_group == $fg) | .priority')
+  
+  if [ -z "$priority" ] || [ "$priority" = "null" ]; then
+    echo "ERROR: Could not find priority for focus group $focus_group"
+    return 1
+  fi
+  
+  # Calculate deadline
+  local deadline=$(approval_matrix_calculate_sla "$priority")
+  
+  # Update the impact
+  impact_update "$file_path" "$focus_group" "sla_deadline" "$deadline"
+  
+  echo "SLA_SET:$focus_group:$deadline"
+  return 0
+}
+```
+
+---
+
+## Usage Examples (Matrix Functions)
+
+```bash
+# Get complete approval matrix state
+matrix=$(approval_matrix_get "concepts/oauth-integration/impact-matrix.md")
+echo "Approved: $(echo $matrix | jq '.approved')/$(echo $matrix | jq '.total_approvals')"
+
+# Calculate SLA deadline for a P1 priority
+deadline=$(approval_matrix_calculate_sla "P1")
+echo "P1 deadline: $deadline"
+
+# Check SLA status for all impacts
+sla_status=$(approval_matrix_check_sla "concepts/oauth-integration/impact-matrix.md")
+echo "Overdue: $(echo $sla_status | jq '.overdue')"
+
+# Get all blockers preventing completion
+blockers=$(approval_matrix_get_blockers "concepts/oauth-integration/impact-matrix.md")
+echo "Blocking issues: $blockers"
+
+# Check if fully approved
+if approval_matrix_is_complete "concepts/oauth-integration/impact-matrix.md"; then
+  echo "Ready for implementation!"
+fi
+
+# Set SLA for a focus group (calculates from priority)
+approval_matrix_set_sla "concepts/oauth-integration/impact-matrix.md" "security"
+```
+
+---
+
+*Library enhanced for WGSD Phase 12 - Matrix-Based Approval System*

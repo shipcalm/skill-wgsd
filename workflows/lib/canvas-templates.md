@@ -865,6 +865,362 @@ build_focus_group_content() {
 
 ---
 
+## Approval Matrix Widget (Phase 12)
+
+### template_approval_matrix
+
+Generate approval matrix widget for concept canvas.
+
+```bash
+# Usage: template_approval_matrix <concept_path>
+# Returns: Formatted markdown approval matrix widget
+template_approval_matrix() {
+  local concept_path="$1"
+  local impact_file="$concept_path/impact-matrix.md"
+  
+  if [ ! -f "$impact_file" ]; then
+    echo "## 📊 Approval Matrix\n\n*No impact matrix defined*"
+    return 1
+  fi
+  
+  # Parse impacts
+  local impacts=$(impact_parse_file "$impact_file")
+  local matrix=$(approval_matrix_get "$impact_file")
+  local sla_status=$(approval_matrix_check_sla "$impact_file")
+  
+  python3 -c "
+import json
+from datetime import datetime, timezone
+
+impacts = json.loads('''$impacts''')
+matrix = json.loads('''$matrix''')
+sla_status = json.loads('''$sla_status''')
+
+approved = matrix['approved']
+total = matrix['total_approvals']
+completion = matrix['completion_percent']
+fully_approved = matrix['fully_approved']
+
+# Status emoji mapping
+status_emoji = {
+    'pending': '⏳',
+    'approved': '✅',
+    'rejected': '🚫',
+    'blocked': '⏸️'
+}
+
+priority_emoji = {
+    'P0': '🔴',
+    'P1': '🟠',
+    'P2': '🟡',
+    'P3': '🟢'
+}
+
+# Create set of overdue/approaching FGs for SLA display
+overdue_fgs = {item['focus_group'] for item in sla_status.get('overdue', [])}
+approaching_fgs = {item['focus_group']: item.get('remaining_hours', '?') 
+                   for item in sla_status.get('approaching', [])}
+
+print('## 📊 Approval Matrix')
+print()
+
+# Overall status banner
+if fully_approved:
+    print('> ✅ **FULLY APPROVED** — Ready for implementation!')
+else:
+    bar_filled = int(completion / 10)
+    bar_empty = 10 - bar_filled
+    progress_bar = '█' * bar_filled + '░' * bar_empty
+    print(f'> **Progress:** [{progress_bar}] {approved}/{total} ({completion}%)')
+
+print()
+print('| Focus Group | Priority | Status | Approver | Date | SLA |')
+print('|-------------|----------|--------|----------|------|-----|')
+
+for impact in impacts:
+    fg = impact.get('focus_group', '?')
+    priority = impact.get('priority', '?')
+    status = impact.get('status', 'pending')
+    approver = impact.get('approver', '—')
+    date = impact.get('approved_date', '—')
+    blocked_by = impact.get('blocked_by')
+    overridden = impact.get('overridden', False)
+    
+    # Priority badge
+    p_emoji = priority_emoji.get(priority, '⚪')
+    p_display = f'{p_emoji} {priority}'
+    
+    # Status display
+    s_emoji = status_emoji.get(status, '❓')
+    if status == 'blocked' and blocked_by:
+        s_display = f'⏸️ Blocked by {blocked_by}'
+    elif overridden:
+        s_display = f'⚡ Override'
+    else:
+        s_display = f'{s_emoji} {status.title()}'
+    
+    # SLA display
+    if status == 'approved':
+        sla_display = '✓'
+    elif fg in overdue_fgs:
+        sla_display = '⛔ OVERDUE'
+    elif fg in approaching_fgs:
+        hours = approaching_fgs[fg]
+        sla_display = f'⚠️ {hours}h'
+    elif status == 'blocked':
+        sla_display = '—'
+    else:
+        sla_display = '✓'
+    
+    # Format approver
+    approver_display = approver if approver and approver != 'null' else '—'
+    date_display = date if date and date != 'null' else '—'
+    
+    # Add row icon for primary owner
+    if impact.get('type') == 'primary-owner':
+        fg = f'👑 {fg}'
+    
+    print(f'| {fg} | {p_display} | {s_display} | {approver_display} | {date_display} | {sla_display} |')
+
+print()
+
+# Blocking dependencies section
+if matrix.get('blocking_fgs'):
+    print('### ⚠️ Blocking Dependencies')
+    print()
+    for impact in impacts:
+        if impact.get('blocked_by'):
+            print(f\"- **{impact['focus_group']}** is waiting on **{impact['blocked_by']}**\")
+            if impact.get('blocked_reason'):
+                print(f\"  - Reason: {impact['blocked_reason']}\")
+    print()
+
+# Rejections section
+rejections = [i for i in impacts if i.get('status') == 'rejected']
+if rejections:
+    print('### 🚫 Rejections')
+    print()
+    for r in rejections:
+        print(f\"- **{r['focus_group']}** rejected\")
+        if r.get('approval_comment'):
+            print(f\"  - Feedback: {r['approval_comment']}\")
+    print()
+
+# Quick actions
+print('### ⚡ Quick Actions')
+print()
+if not fully_approved:
+    print('- Approve: `/wgsd approve <concept> --fg <focus-group>`')
+    print('- Block: `/wgsd block <concept> --fg <fg> --blocked-by <other-fg>`')
+    print('- Override (admin): `/wgsd override <concept> --fg <fg>`')
+else:
+    print('- Create implementation: `/wgsd create-implementation <concept>`')
+    print('- Assign owner: `/wgsd assign <concept> @user`')
+"
+  return 0
+}
+```
+
+---
+
+### format_approval_status
+
+Format a single approval status with emoji.
+
+```bash
+# Usage: format_approval_status <status>
+# Returns: Formatted status string
+format_approval_status() {
+  local status="$1"
+  
+  case "$status" in
+    approved)
+      echo "✅ Approved"
+      ;;
+    pending)
+      echo "⏳ Pending"
+      ;;
+    rejected)
+      echo "🚫 Rejected"
+      ;;
+    blocked)
+      echo "⏸️ Blocked"
+      ;;
+    *)
+      echo "❓ Unknown"
+      ;;
+  esac
+}
+```
+
+---
+
+### format_priority_badge
+
+Format priority with color emoji.
+
+```bash
+# Usage: format_priority_badge <priority>
+# Returns: Formatted priority badge
+format_priority_badge() {
+  local priority="$1"
+  
+  case "$priority" in
+    P0)
+      echo "🔴 P0"
+      ;;
+    P1)
+      echo "🟠 P1"
+      ;;
+    P2)
+      echo "🟡 P2"
+      ;;
+    P3)
+      echo "🟢 P3"
+      ;;
+    *)
+      echo "⚪ $priority"
+      ;;
+  esac
+}
+```
+
+---
+
+### format_sla_status
+
+Format SLA status indicator.
+
+```bash
+# Usage: format_sla_status <deadline> <current_status>
+# Returns: Formatted SLA indicator
+format_sla_status() {
+  local deadline="$1"
+  local status="$2"
+  
+  # Already approved
+  if [ "$status" = "approved" ]; then
+    echo "✓"
+    return 0
+  fi
+  
+  # No deadline set
+  if [ -z "$deadline" ] || [ "$deadline" = "null" ]; then
+    echo "—"
+    return 0
+  fi
+  
+  python3 -c "
+from datetime import datetime, timezone
+
+deadline_str = '$deadline'
+now = datetime.now(timezone.utc)
+
+try:
+    deadline = datetime.fromisoformat(deadline_str.replace('Z', '+00:00'))
+    
+    if now > deadline:
+        print('⛔ OVERDUE')
+    else:
+        remaining = deadline - now
+        hours = remaining.total_seconds() / 3600
+        
+        if hours < 4:
+            print(f'⚠️ {hours:.1f}h')
+        elif hours < 24:
+            print(f'⚠️ {hours:.0f}h')
+        else:
+            print('✓')
+except:
+    print('—')
+"
+}
+```
+
+---
+
+### build_concept_canvas_content
+
+Build complete concept canvas content including approval matrix.
+
+```bash
+# Usage: build_concept_canvas_content <repo_path> <focus_group> <concept_name>
+# Returns: Complete markdown content for concept canvas
+build_concept_canvas_content() {
+  local repo_path="$1"
+  local fg_name="$2"
+  local concept_name="$3"
+  
+  local concept_path="$repo_path/.planning/focus-groups/$fg_name/concepts/$concept_name"
+  local concept_file="$concept_path/CONCEPT.md"
+  
+  if [ ! -f "$concept_file" ]; then
+    echo "ERROR: Concept not found: $concept_name"
+    return 1
+  fi
+  
+  local result=""
+  
+  # Header
+  result+="# 💡 $concept_name\n\n"
+  
+  # Status bar
+  local status=$(grep -m1 "^\*\*Status:\*\*" "$concept_file" 2>/dev/null | sed 's/\*\*Status:\*\*//' | xargs || echo "Draft")
+  local priority=$(grep -m1 "^\*\*Priority:\*\*" "$concept_file" 2>/dev/null | sed 's/\*\*Priority:\*\*//' | xargs || echo "")
+  
+  result+="**Status:** $status"
+  [ -n "$priority" ] && result+=" | **Priority:** $priority"
+  result+="\n\n---\n\n"
+  
+  # Approval Matrix Widget (if impact-matrix.md exists)
+  if [ -f "$concept_path/impact-matrix.md" ]; then
+    result+="$(template_approval_matrix "$concept_path")\n\n---\n\n"
+  fi
+  
+  # Concept Overview (from CONCEPT.md)
+  result+="## Overview\n\n"
+  local overview=$(sed -n '/## Problem Statement/,/## Technical Approach/p' "$concept_file" 2>/dev/null | head -40)
+  if [ -n "$overview" ]; then
+    result+="$overview\n\n"
+  fi
+  
+  # Related Artifacts
+  result+="## 📎 Artifacts\n\n"
+  for artifact in "$concept_path"/*.md; do
+    [ -f "$artifact" ] || continue
+    local artifact_name=$(basename "$artifact")
+    
+    case "$artifact_name" in
+      CONCEPT.md)
+        result+="- 📄 [Concept Definition]($artifact_name)\n"
+        ;;
+      impact-matrix.md)
+        result+="- 📊 [Impact Matrix]($artifact_name)\n"
+        ;;
+      acceptance-criteria.md)
+        result+="- ✅ [Acceptance Criteria]($artifact_name)\n"
+        ;;
+      API-SPEC.md)
+        result+="- 📡 [API Specification]($artifact_name)\n"
+        ;;
+      *)
+        result+="- 📄 [$artifact_name]($artifact_name)\n"
+        ;;
+    esac
+  done
+  
+  # Footer
+  result+="\n---\n\n"
+  result+="*Last updated: $(date -u +"%Y-%m-%d %H:%M UTC")*\n"
+  result+="*Discuss in concept channel • Use /wgsd commands to update*"
+  
+  echo -e "$result"
+  return 0
+}
+```
+
+---
+
 ## Usage Examples
 
 ```bash
@@ -880,8 +1236,14 @@ content=$(build_master_dashboard_content "/path/to/repo" "Marvin" "mvn")
 
 # Format focus groups for display
 list=$(format_focus_groups_list "/path/to/repo")
+
+# Generate approval matrix widget
+widget=$(template_approval_matrix "/path/to/concept")
+
+# Build complete concept canvas with approval matrix
+canvas=$(build_concept_canvas_content "/path/to/repo" "security" "oauth-integration")
 ```
 
 ---
 
-*Library created for WGSD Phase 4*
+*Library enhanced for WGSD Phase 12 - Matrix-Based Approval System*

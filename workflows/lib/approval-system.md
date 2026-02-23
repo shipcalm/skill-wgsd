@@ -568,5 +568,341 @@ advance_state "$CONCEPT" "$FG" "ready"
 
 ---
 
-*Library created for Phase 5: Workflow Engine*
+## Matrix-Based Approval System (Phase 12)
+
+The following functions support the matrix-based approval system where each impacted focus group independently approves a concept.
+
+---
+
+### approval_matrix_summary
+
+Get a human-readable summary of approval matrix status.
+
+```bash
+# Usage: approval_matrix_summary <concept_path>
+# Returns: Formatted approval matrix summary
+approval_matrix_summary() {
+  local concept_path="$1"
+  local impact_file="$concept_path/impact-matrix.md"
+  
+  if [ ! -f "$impact_file" ]; then
+    echo "ERROR: Impact matrix not found"
+    return 1
+  fi
+  
+  local matrix=$(approval_matrix_get "$impact_file")
+  
+  python3 -c "
+import json
+
+matrix = json.loads('''$matrix''')
+
+concept = matrix.get('concept', 'unknown')
+approved = matrix['approved']
+total = matrix['total_approvals']
+pending = matrix['pending']
+rejected = matrix['rejected']
+blocked = matrix['blocked']
+completion = matrix['completion_percent']
+fully = matrix['fully_approved']
+
+status_emoji = {
+    'pending': '⏳',
+    'approved': '✅',
+    'rejected': '🚫',
+    'blocked': '⏸️'
+}
+
+priority_emoji = {
+    'P0': '🔴',
+    'P1': '🟠',
+    'P2': '🟡',
+    'P3': '🟢'
+}
+
+print(f'📊 **Approval Matrix: {concept}**')
+print()
+
+if fully:
+    print('✅ **FULLY APPROVED** - Ready for implementation!')
+else:
+    print(f'**Progress:** {approved}/{total} ({completion}%)')
+
+print()
+print('| Focus Group | Priority | Status | Approver | Date |')
+print('|-------------|----------|--------|----------|------|')
+
+for impact in matrix['details']:
+    fg = impact.get('focus_group', '?')
+    priority = impact.get('priority', '?')
+    status = impact.get('status', 'pending')
+    approver = impact.get('approver', '—')
+    date = impact.get('approved_date', '—')
+    blocked_by = impact.get('blocked_by')
+    
+    p_icon = priority_emoji.get(priority, '⚪')
+    s_icon = status_emoji.get(status, '❓')
+    
+    status_display = f'{s_icon} {status.title()}'
+    if blocked_by:
+        status_display = f'⏸️ Blocked by {blocked_by}'
+    
+    print(f'| {fg} | {p_icon} {priority} | {status_display} | {approver or \"—\"} | {date or \"—\"} |')
+
+if matrix['blocking_fgs']:
+    print()
+    print(f'⚠️ **Blocking Dependencies:** {', '.join(matrix[\"blocking_fgs\"])}')
+
+if rejected > 0:
+    print()
+    print(f'🚫 **Has Rejections:** Review feedback before proceeding')
+"
+  return 0
+}
+```
+
+---
+
+### approval_matrix_check_completion
+
+Comprehensive check for concept completion with detailed status.
+
+```bash
+# Usage: approval_matrix_check_completion <concept_path>
+# Returns: JSON with completion status and next actions
+approval_matrix_check_completion() {
+  local concept_path="$1"
+  local impact_file="$concept_path/impact-matrix.md"
+  
+  if [ ! -f "$impact_file" ]; then
+    echo '{"error": "Impact matrix not found"}'
+    return 1
+  fi
+  
+  local matrix=$(approval_matrix_get "$impact_file")
+  
+  python3 -c "
+import json
+
+matrix = json.loads('''$matrix''')
+
+approved = matrix['approved']
+total = matrix['total_approvals']
+pending = matrix['pending']
+rejected = matrix['rejected']
+blocked = matrix['blocked']
+fully = matrix['fully_approved']
+
+result = {
+    'is_complete': fully,
+    'progress': f'{approved}/{total}',
+    'completion_percent': matrix['completion_percent'],
+    'can_implement': fully,
+    'blockers': [],
+    'next_actions': []
+}
+
+# Identify blockers
+for impact in matrix['details']:
+    status = impact.get('status')
+    fg = impact.get('focus_group')
+    
+    if status == 'pending':
+        result['blockers'].append({
+            'type': 'pending_approval',
+            'focus_group': fg,
+            'action': f'Request review from {fg} focus group'
+        })
+    elif status == 'rejected':
+        result['blockers'].append({
+            'type': 'rejection',
+            'focus_group': fg,
+            'reason': impact.get('approval_comment', 'No reason given'),
+            'action': f'Address {fg} feedback and re-request approval'
+        })
+    elif status == 'blocked':
+        result['blockers'].append({
+            'type': 'blocked',
+            'focus_group': fg,
+            'blocked_by': impact.get('blocked_by'),
+            'action': f'Wait for {impact.get(\"blocked_by\")} to approve first'
+        })
+
+# Generate next actions
+if not fully:
+    if pending > 0:
+        result['next_actions'].append('Follow up with pending focus groups')
+    if rejected > 0:
+        result['next_actions'].append('Address rejection feedback')
+    if blocked > 0:
+        result['next_actions'].append('Resolve blocking dependencies')
+else:
+    result['next_actions'].append('Create implementation: /wgsd create-implementation')
+    result['next_actions'].append('Assign owner: /wgsd assign')
+
+print(json.dumps(result, indent=2))
+"
+  return 0
+}
+```
+
+---
+
+### approval_matrix_get_pending_approvers
+
+Get list of users/FGs that still need to approve.
+
+```bash
+# Usage: approval_matrix_get_pending_approvers <concept_path>
+# Returns: JSON array of pending approvers with FG and user info
+approval_matrix_get_pending_approvers() {
+  local concept_path="$1"
+  local impact_file="$concept_path/impact-matrix.md"
+  local repo_path="${2:-.}"
+  
+  local impacts=$(impact_parse_file "$impact_file")
+  
+  python3 -c "
+import json
+
+impacts = json.loads('''$impacts''')
+
+pending = []
+for impact in impacts:
+    status = impact.get('status', 'pending')
+    if status in ['pending', 'blocked']:
+        pending.append({
+            'focus_group': impact.get('focus_group'),
+            'priority': impact.get('priority'),
+            'status': status,
+            'blocked_by': impact.get('blocked_by'),
+            'sla_deadline': impact.get('sla_deadline')
+        })
+
+# Sort by priority (P0 first)
+priority_order = {'P0': 0, 'P1': 1, 'P2': 2, 'P3': 3}
+pending.sort(key=lambda x: priority_order.get(x['priority'], 99))
+
+print(json.dumps(pending, indent=2))
+"
+  return 0
+}
+```
+
+---
+
+### approval_matrix_reminder
+
+Generate reminder message for pending approvals.
+
+```bash
+# Usage: approval_matrix_reminder <concept_path>
+# Returns: Formatted reminder message
+approval_matrix_reminder() {
+  local concept_path="$1"
+  local concept_name=$(basename "$concept_path")
+  
+  local pending=$(approval_matrix_get_pending_approvers "$concept_path")
+  local sla_status=$(approval_matrix_check_sla "$concept_path/impact-matrix.md")
+  
+  python3 -c "
+import json
+
+pending = json.loads('''$pending''')
+sla_status = json.loads('''$sla_status''')
+concept = '$concept_name'
+
+if not pending:
+    print('✅ No pending approvals - concept is fully approved!')
+    exit(0)
+
+print(f'⏰ **Approval Reminder: {concept}**')
+print()
+
+# Overdue
+if sla_status.get('overdue'):
+    print('🔴 **OVERDUE:**')
+    for item in sla_status['overdue']:
+        print(f'  - {item[\"focus_group\"]} (deadline: {item[\"deadline\"]})')
+    print()
+
+# Approaching deadline
+if sla_status.get('approaching'):
+    print('⚠️ **Approaching Deadline:**')
+    for item in sla_status['approaching']:
+        print(f'  - {item[\"focus_group\"]} ({item[\"remaining_hours\"]}h remaining)')
+    print()
+
+# Pending
+pending_only = [p for p in pending if p['status'] == 'pending']
+if pending_only:
+    print('⏳ **Pending Review:**')
+    for item in pending_only:
+        print(f'  - {item[\"focus_group\"]} ({item[\"priority\"]})')
+    print()
+
+# Blocked
+blocked = [p for p in pending if p['status'] == 'blocked']
+if blocked:
+    print('⏸️ **Blocked:**')
+    for item in blocked:
+        print(f'  - {item[\"focus_group\"]} (waiting on {item[\"blocked_by\"]})')
+    print()
+
+print('Use `/wgsd approve " + concept + " --fg <focus-group>` to approve.')
+"
+  return 0
+}
+```
+
+---
+
+### approval_matrix_trigger_on_complete
+
+Called when concept becomes fully approved. Triggers Phase 13 integration.
+
+```bash
+# Usage: approval_matrix_trigger_on_complete <concept_path>
+approval_matrix_trigger_on_complete() {
+  local concept_path="$1"
+  local concept_name=$(basename "$concept_path")
+  local fg_name=$(basename $(dirname $(dirname "$concept_path")))
+  
+  echo "=== APPROVAL COMPLETE: $concept_name ==="
+  
+  # 1. Update concept file status
+  local concept_file="$concept_path/CONCEPT.md"
+  if [ -f "$concept_file" ]; then
+    sed -i 's/\*\*Status:\*\* .*/\*\*Status:\*\* 🚀 Ready for Implementation/' "$concept_file"
+    echo "✓ Updated concept status"
+  fi
+  
+  # 2. Create approved marker with timestamp
+  cat > "$concept_path/.approved" <<EOF
+approved_at: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+concept: $concept_name
+focus_group: $fg_name
+EOF
+  echo "✓ Created approval marker"
+  
+  # 3. Add to implementation queue (if exists)
+  local queue_file=".planning/IMPLEMENTATION-QUEUE.md"
+  if [ -f "$queue_file" ]; then
+    echo "- [ ] $concept_name (Approved: $(date +%Y-%m-%d))" >> "$queue_file"
+    echo "✓ Added to implementation queue"
+  fi
+  
+  # 4. Output trigger for Phase 13 roadmap merge
+  echo ""
+  echo "TRIGGER:roadmap_merge:$concept_name"
+  echo "TRIGGER:notify_channel:$concept_name:approved"
+  echo "TRIGGER:canvas_update:$fg_name"
+  
+  return 0
+}
+```
+
+---
+
+*Library enhanced for Phase 12: Matrix-Based Approval System*
 *Supports WORKFLOW-02: Focus group approval process*

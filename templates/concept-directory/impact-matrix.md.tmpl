@@ -9,19 +9,45 @@ primary_focus_group: {{PRIMARY_FOCUS_GROUP}}
 status: draft
 version: 1
 
-# Structured impact declarations (machine-parseable)
+# Approval Matrix Configuration
+approval_matrix:
+  required_approvals: all          # "all" | number (e.g., 2)
+  allow_partial_implementation: false
+  sla_config:
+    P0: 4                          # hours
+    P1: 24
+    P2: 72
+    P3: 168                        # 7 days
+
+# Structured impact declarations with approval tracking (machine-parseable)
 impacts:
   - focus_group: {{PRIMARY_FOCUS_GROUP}}
     priority: {{PRIORITY}}
     type: primary-owner
     description: "{{IMPACT_DESCRIPTION}}"
-    status: pending
+    # Core approval tracking
+    status: pending                 # pending | approved | rejected | blocked
     approver: null
     approved_date: null
+    approval_comment: null
+    # Notification tracking
     notified: false
     notified_date: null
+    # Matrix-specific: Blocking dependencies
+    blocked_by: null                # Focus group blocking this approval
+    blocked_reason: null
+    blocked_date: null
+    # Matrix-specific: SLA tracking
+    sla_deadline: null              # Auto-calculated from priority + creation
+    sla_warning_sent: false
+    # Matrix-specific: Admin override
+    overridden: false
+    override_by: null
+    override_date: null
+    override_reason: null
+    original_status: null           # Preserved for audit
 
-# Example additional impact (copy and modify):
+# Example additional impact with full matrix fields:
 # - focus_group: security
 #   priority: P1
 #   type: integration
@@ -29,8 +55,19 @@ impacts:
 #   status: pending
 #   approver: null
 #   approved_date: null
+#   approval_comment: null
 #   notified: false
 #   notified_date: null
+#   blocked_by: null
+#   blocked_reason: null
+#   blocked_date: null
+#   sla_deadline: null
+#   sla_warning_sent: false
+#   overridden: false
+#   override_by: null
+#   override_date: null
+#   override_reason: null
+#   original_status: null
 
 # Schema Reference:
 # priority: P0 (Critical) | P1 (High) | P2 (Medium) | P3 (Low)
@@ -43,7 +80,7 @@ impacts:
 
 This file declares which focus groups are impacted by this concept and tracks approval status. Each impact becomes an approval requirement before implementation.
 
-**Cross-Cutting Support:** A single concept can impact multiple focus groups. For example, "OAuth Integration" might declare impacts on Security (token validation), API (endpoint changes), and Frontend (login UI).
+**Matrix-Based Approval:** Each impacted focus group independently reviews and approves. A concept is fully approved only when ALL required focus groups have approved.
 
 ---
 
@@ -57,6 +94,7 @@ This file declares which focus groups are impacted by this concept and tracks ap
 | **Impact Type** | Primary Owner |
 | **Description** | {{IMPACT_DESCRIPTION}} |
 | **Approval Status** | ⏳ Pending |
+| **SLA Deadline** | — |
 | **Approver** | — |
 | **Approved Date** | — |
 
@@ -94,26 +132,35 @@ To declare impact on additional focus groups:
 
 ---
 
-## Impact Summary
+## Approval Matrix Status
 
-| Focus Group | Priority | Type | Status | Approver |
-|-------------|----------|------|--------|----------|
-| {{PRIMARY_FOCUS_GROUP}} | {{PRIORITY}} | primary-owner | ⏳ Pending | — |
+| Focus Group | Priority | Type | Status | Blocked By | SLA | Approver |
+|-------------|----------|------|--------|------------|-----|----------|
+| {{PRIMARY_FOCUS_GROUP}} | {{PRIORITY}} | primary-owner | ⏳ Pending | — | — | — |
+
+### Status Legend
+- ⏳ Pending - Awaiting review
+- ✅ Approved - Focus group approved
+- 🚫 Rejected - Focus group rejected (see feedback)
+- ⏸️ Blocked - Waiting on dependency
+
+### SLA Legend
+- ✓ On track
+- ⚠️ Approaching deadline
+- ⛔ Overdue
 
 ---
 
 ## Approval Requirements
 
 **Required for Implementation:**
-- [ ] All impacted focus groups must approve
+- [ ] All impacted focus groups must approve (status = approved)
+- [ ] No "Rejected" statuses (unless overridden)
 - [ ] No "Blocked" statuses remaining
 - [ ] Primary focus group approved
 
-**Status Legend:**
-- ⏳ Pending - Awaiting review
-- ✅ Approved - Focus group approved
-- 🚫 Rejected - Focus group rejected (see feedback)
-- ⏸️ Blocked - Waiting on dependency
+**Override Authority:**
+Admins can force-approve blocked or pending approvals using `/wgsd override`. This creates an audit trail and notifies the original focus group.
 
 ---
 
@@ -125,4 +172,4 @@ To declare impact on additional focus groups:
 
 ---
 
-*This file is auto-generated and managed by WGSD. Use `/wgsd declare-impact` to modify impacts.*
+*This file is auto-generated and managed by WGSD. Use `/wgsd declare-impact` to modify impacts, `/wgsd approve` to approve, or `/wgsd block` to declare dependencies.*
