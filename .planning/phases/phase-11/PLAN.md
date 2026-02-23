@@ -1,10 +1,11 @@
 # Phase 11: Cross-Cutting Impact System
 
-**Status:** 🔵 PLANNED - Ready for Execution  
+**Status:** ✅ COMPLETE  
 **Priority:** P0 - Critical  
 **Duration:** ~2-3 hours  
 **Dependencies:** Phase 10 (Complete)  
-**Planned:** 2026-02-23
+**Planned:** 2026-02-23  
+**Completed:** 2026-02-23
 
 ---
 
@@ -34,10 +35,10 @@ Enable concepts to declare and track impact across multiple focus groups, suppor
 
 | ID | Requirement | Status | Effort | Files |
 |----|-------------|--------|--------|-------|
-| IMPACT-01 | Impact matrix file format | 🔵 Planned | S | templates/concept-directory/impact-matrix.md.tmpl |
-| IMPACT-02 | Impact declaration workflow | 🔵 Planned | M | workflows/declare-impact.md (NEW) |
-| IMPACT-03 | Automatic focus group notifications | 🔵 Planned | M | workflows/lib/impact-notifications.md (NEW) |
-| IMPACT-04 | Impact change tracking | 🔵 Planned | M | workflows/update-impact.md (NEW) |
+| IMPACT-01 | Impact matrix file format | ✅ Complete | S | templates/concept-directory/impact-matrix.md.tmpl, workflows/lib/impact-parser.md |
+| IMPACT-02 | Impact declaration workflow | ✅ Complete | M | workflows/declare-impact.md |
+| IMPACT-03 | Automatic focus group notifications | ✅ Complete | M | workflows/lib/impact-notifications.md |
+| IMPACT-04 | Impact change tracking | ✅ Complete | M | workflows/update-impact.md |
 
 ---
 

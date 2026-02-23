@@ -4,22 +4,52 @@
 ---
 concept: {{CONCEPT_SLUG}}
 created: {{DATE}}
+updated: {{DATE}}
+primary_focus_group: {{PRIMARY_FOCUS_GROUP}}
 status: draft
-total_impacts: 0
+version: 1
+
+# Structured impact declarations (machine-parseable)
+impacts:
+  - focus_group: {{PRIMARY_FOCUS_GROUP}}
+    priority: {{PRIORITY}}
+    type: primary-owner
+    description: "{{IMPACT_DESCRIPTION}}"
+    status: pending
+    approver: null
+    approved_date: null
+    notified: false
+    notified_date: null
+
+# Example additional impact (copy and modify):
+# - focus_group: security
+#   priority: P1
+#   type: integration
+#   description: "Token validation changes affect auth flow"
+#   status: pending
+#   approver: null
+#   approved_date: null
+#   notified: false
+#   notified_date: null
+
+# Schema Reference:
+# priority: P0 (Critical) | P1 (High) | P2 (Medium) | P3 (Low)
+# type: primary-owner | breaking-change | api-change | documentation | integration | testing | behavior | security | performance
+# status: pending | approved | rejected | blocked
 ---
 ```
 
 ## Overview
 
-This file declares which focus groups are impacted by this concept and tracks approval status.
+This file declares which focus groups are impacted by this concept and tracks approval status. Each impact becomes an approval requirement before implementation.
+
+**Cross-Cutting Support:** A single concept can impact multiple focus groups. For example, "OAuth Integration" might declare impacts on Security (token validation), API (endpoint changes), and Frontend (login UI).
 
 ---
 
 ## Impact Declarations
 
-*Add impacted focus groups below. Each impact becomes an approval requirement.*
-
-### Focus Group: {{PRIMARY_FOCUS_GROUP}}
+### Focus Group: {{PRIMARY_FOCUS_GROUP}} (Primary Owner)
 
 | Field | Value |
 |-------|-------|
@@ -32,30 +62,43 @@ This file declares which focus groups are impacted by this concept and tracks ap
 
 ---
 
-### Template: Additional Focus Group
+## Adding Cross-Cutting Impacts
 
-*Copy this section for each additional impacted focus group:*
+To declare impact on additional focus groups:
 
-```markdown
-### Focus Group: {focus-group-name}
+1. **Interactive Method:** Run `/wgsd declare-impact {{CONCEPT_SLUG}}`
+2. **Manual Method:** Add entries to the `impacts:` array in YAML frontmatter
 
-| Field | Value |
-|-------|-------|
-| **Priority** | P0/P1/P2/P3 |
-| **Impact Type** | Breaking Change / API Change / Documentation / Integration / Testing |
-| **Description** | How this concept impacts the focus group |
-| **Approval Status** | ⏳ Pending |
-| **Approver** | — |
-| **Approved Date** | — |
-```
+### Impact Type Reference
+
+| Type | Description | Example |
+|------|-------------|---------|
+| `primary-owner` | This FG owns the concept | The originating focus group |
+| `breaking-change` | API/behavior breaking changes | Endpoint signature changes |
+| `api-change` | Non-breaking API modifications | New optional parameters |
+| `documentation` | Docs must be updated | API reference changes |
+| `integration` | Integration touchpoints affected | Auth flow changes |
+| `testing` | Test suite modifications needed | New test scenarios |
+| `behavior` | Behavior changes (non-breaking) | Default value changes |
+| `security` | Security implications | Token handling, permissions |
+| `performance` | Performance considerations | Query optimization needs |
+
+### Priority Reference
+
+| Priority | SLA | Description |
+|----------|-----|-------------|
+| P0 | 4h | Critical - blocks other work |
+| P1 | 24h | High - affects current sprint |
+| P2 | 72h | Medium - planned work impact |
+| P3 | 7d | Low - nice to know |
 
 ---
 
 ## Impact Summary
 
-| Focus Group | Priority | Status | Approver |
-|-------------|----------|--------|----------|
-| {{PRIMARY_FOCUS_GROUP}} | {{PRIORITY}} | ⏳ Pending | — |
+| Focus Group | Priority | Type | Status | Approver |
+|-------------|----------|------|--------|----------|
+| {{PRIMARY_FOCUS_GROUP}} | {{PRIORITY}} | primary-owner | ⏳ Pending | — |
 
 ---
 
@@ -82,4 +125,4 @@ This file declares which focus groups are impacted by this concept and tracks ap
 
 ---
 
-*This file is auto-generated and managed by WGSD. Canvas syncs from git.*
+*This file is auto-generated and managed by WGSD. Use `/wgsd declare-impact` to modify impacts.*

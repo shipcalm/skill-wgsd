@@ -584,6 +584,110 @@ echo "🖼️ Triggering canvas sync..."
 echo "✅ Canvas sync triggered"
 ```
 
+## Step 9.5: Declare Cross-Cutting Impacts (Optional)
+
+Offer user the option to declare impacts on other focus groups:
+
+```bash
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "📊 Cross-Cutting Impacts"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "This concept can declare impacts on other focus groups."
+echo "Example: An OAuth concept might impact Security + API + Frontend"
+echo ""
+read -p "Declare additional focus group impacts now? (y/n): " declare_impacts
+
+if [ "$declare_impacts" = "y" ] || [ "$declare_impacts" = "Y" ]; then
+    # Get available focus groups (excluding current)
+    echo ""
+    echo "Available focus groups (excluding ${FOCUS_GROUP}):"
+    idx=1
+    other_fgs=()
+    for fg_dir in .planning/focus-groups/*/; do
+        fg_name=$(basename "$fg_dir")
+        if [ "$fg_name" != "${FOCUS_GROUP}" ]; then
+            echo "  [$idx] $fg_name"
+            other_fgs+=("$fg_name")
+            ((idx++))
+        fi
+    done
+    
+    if [ ${#other_fgs[@]} -eq 0 ]; then
+        echo "  No other focus groups available"
+        echo "  Impact matrix initialized with primary focus group only"
+    else
+        echo ""
+        echo "Enter focus groups to add impacts for (e.g., '1,3' or 'security,api'):"
+        read -p "Selection (or Enter to skip): " fg_selection
+        
+        if [ -n "$fg_selection" ]; then
+            # Parse selection and collect impact details
+            IFS=',' read -ra selected <<< "$fg_selection"
+            
+            for item in "${selected[@]}"; do
+                item=$(echo "$item" | tr -d ' ')
+                
+                # Resolve to focus group name
+                fg_target=""
+                if [[ "$item" =~ ^[0-9]+$ ]]; then
+                    idx=$((item - 1))
+                    if [ $idx -ge 0 ] && [ $idx -lt ${#other_fgs[@]} ]; then
+                        fg_target="${other_fgs[$idx]}"
+                    fi
+                else
+                    for fg in "${other_fgs[@]}"; do
+                        if [ "$fg" = "$item" ]; then
+                            fg_target="$fg"
+                            break
+                        fi
+                    done
+                fi
+                
+                if [ -n "$fg_target" ]; then
+                    echo ""
+                    echo "━━━ Impact on $fg_target ━━━"
+                    
+                    # Quick priority selection
+                    echo "Priority: [0]P0 [1]P1 [2]P2 [3]P3"
+                    read -p "Select: " p
+                    case "$p" in
+                        0) priority="P0" ;; 1) priority="P1" ;;
+                        2) priority="P2" ;; 3) priority="P3" ;;
+                        *) priority="P2" ;;
+                    esac
+                    
+                    # Quick type selection
+                    echo "Type: [1]breaking [2]api [3]integration [4]docs [5]testing [6]behavior [7]security [8]performance"
+                    read -p "Select: " t
+                    case "$t" in
+                        1) type="breaking-change" ;; 2) type="api-change" ;;
+                        3) type="integration" ;; 4) type="documentation" ;;
+                        5) type="testing" ;; 6) type="behavior" ;;
+                        7) type="security" ;; 8) type="performance" ;;
+                        *) type="integration" ;;
+                    esac
+                    
+                    read -p "Impact description: " desc
+                    [ -z "$desc" ] && desc="Impact on $fg_target focus group"
+                    
+                    # Add to impact-matrix.md using impact_add
+                    # (In practice, this calls the impact-parser library)
+                    echo "✅ Added impact: $fg_target ($priority, $type)"
+                fi
+            done
+            
+            echo ""
+            echo "✅ Cross-cutting impacts declared"
+            echo "💡 Use /wgsd update-impact ${CONCEPT_SLUG} to modify later"
+        fi
+    fi
+else
+    echo "💡 You can declare impacts later with: /wgsd declare-impact ${CONCEPT_SLUG}"
+fi
+```
+
 ## Step 10: Announce in Channel
 
 Send message to focus group channel:

@@ -34,6 +34,8 @@ What would you like to do?
 - **create-concept [name]** - Create concept within current focus group channel
 - **promote-concept [name]** - Move concept to implementation queue
 - **list-concepts [focus-group]** - Show concepts for focus group
+- **declare-impact [concept]** - Declare cross-cutting focus group impacts
+- **update-impact [concept]** - Modify existing impact declarations
 
 **Implementation Commands:**
 - **create-implementation [concept]** - Start implementation from mature concept
@@ -132,6 +134,8 @@ Based on user input, route to appropriate workflow:
 | "update community canvas", "community canvas" | workflows/community-visibility.md |
 | "attribute", "attribution" | workflows/community-visibility.md |
 | "publish update", "progress update" | workflows/community-visibility.md |
+| "declare impact", "declare-impact", "impact" | workflows/declare-impact.md |
+| "update impact", "update-impact", "modify impact" | workflows/update-impact.md |
 
 </routing>
 
