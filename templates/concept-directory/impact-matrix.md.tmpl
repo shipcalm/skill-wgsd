@@ -1,0 +1,85 @@
+# Impact Matrix: {{CONCEPT_NAME}}
+
+```yaml
+---
+concept: {{CONCEPT_SLUG}}
+created: {{DATE}}
+status: draft
+total_impacts: 0
+---
+```
+
+## Overview
+
+This file declares which focus groups are impacted by this concept and tracks approval status.
+
+---
+
+## Impact Declarations
+
+*Add impacted focus groups below. Each impact becomes an approval requirement.*
+
+### Focus Group: {{PRIMARY_FOCUS_GROUP}}
+
+| Field | Value |
+|-------|-------|
+| **Priority** | {{PRIORITY}} |
+| **Impact Type** | Primary Owner |
+| **Description** | {{IMPACT_DESCRIPTION}} |
+| **Approval Status** | ⏳ Pending |
+| **Approver** | — |
+| **Approved Date** | — |
+
+---
+
+### Template: Additional Focus Group
+
+*Copy this section for each additional impacted focus group:*
+
+```markdown
+### Focus Group: {focus-group-name}
+
+| Field | Value |
+|-------|-------|
+| **Priority** | P0/P1/P2/P3 |
+| **Impact Type** | Breaking Change / API Change / Documentation / Integration / Testing |
+| **Description** | How this concept impacts the focus group |
+| **Approval Status** | ⏳ Pending |
+| **Approver** | — |
+| **Approved Date** | — |
+```
+
+---
+
+## Impact Summary
+
+| Focus Group | Priority | Status | Approver |
+|-------------|----------|--------|----------|
+| {{PRIMARY_FOCUS_GROUP}} | {{PRIORITY}} | ⏳ Pending | — |
+
+---
+
+## Approval Requirements
+
+**Required for Implementation:**
+- [ ] All impacted focus groups must approve
+- [ ] No "Blocked" statuses remaining
+- [ ] Primary focus group approved
+
+**Status Legend:**
+- ⏳ Pending - Awaiting review
+- ✅ Approved - Focus group approved
+- 🚫 Rejected - Focus group rejected (see feedback)
+- ⏸️ Blocked - Waiting on dependency
+
+---
+
+## Change Log
+
+| Date | Change | Author |
+|------|--------|--------|
+| {{DATE}} | Impact matrix created | {{CREATOR}} |
+
+---
+
+*This file is auto-generated and managed by WGSD. Canvas syncs from git.*
