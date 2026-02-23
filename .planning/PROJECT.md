@@ -1,89 +1,151 @@
-# WGSD v2.1 - Migration Experience Improvements
+# WGSD v2.2 - Matrix-Based Social Development Architecture
 
 ## What This Is
 
-A focused iteration on the WGSD migration system based on real-world user feedback. Addresses migration logic errors, adds Slack channel automation, and introduces interactive approval workflow for safer migrations.
+A major architectural evolution that transforms WGSD from single focus group ownership to a sophisticated multi-stakeholder approval matrix. Concepts become first-class citizens with their own branches, directories, and cross-cutting impact declarations. The roadmap branch becomes the authoritative source for approved concepts, with implementations branching from roadmap rather than develop.
 
 ## Core Value
 
-Make GSD → WGSD migration bulletproof with correct mapping logic, full automation, and user confidence through interactive approval before execution.
+Enable complex enterprise concepts that impact multiple focus groups to be properly planned, prioritized across stakeholders, and approved through conversational Slack-native workflows. Developers get clear visibility into git branches and worktree paths. Emergency hotfixes bypass the full approval matrix when speed matters.
 
 ---
 
-## Current Milestone: v2.1 Migration Experience Improvements
+## Current Milestone: v2.2 Matrix-Based Social Development
 
-**Goal:** Fix migration logic, automate Slack channels, add approval step
+**Goal:** Transform from single focus group ownership to cross-cutting concept approval matrix
 
-**Target features:**
-- Correct Phase → Concept mapping (not Focus Group)
-- Auto-create all WGSD Slack channels during migration
-- Interactive preview/approval before migration execution
+**Target Architecture Changes:**
+1. **Cross-cutting concept support** - concepts impact multiple focus groups
+2. **Canvas developer info** - git branch + worktree paths displayed
+3. **Concept-centric architecture** - independent concept branches + directories (not single .md files)
+4. **Matrix-based approval system** - multi-stakeholder approval with per-focus-group prioritization
+5. **Roadmap branch architecture** - approved concepts merge to roadmap, implementations branch from roadmap
+6. **Slack-native approval workflow** - conversational approvals, not GitHub PRs
+7. **Emergency hotfix bypass** - direct develop → fix → develop for emergencies
 
 ---
 
-## Previous: v2.0 - Social Development Operating System
+## Previous Milestones
 
-Comprehensive enhancement that transforms individual GSD projects into collaborative social development platforms. Provides intelligent migration from GSD to WGSD, creates structured channel infrastructure with AI-managed Canvas integration, and enables seamless community feedback → development pipelines through Slack-native collaborative workflows.
+### v2.1 - Migration Experience Improvements ✅
+Fixed migration logic, added Slack channel automation, introduced approval workflow.
 
-## Requirements
+### v2.0 - Social Development Operating System ✅
+Complete WGSD foundation with 47 requirements — migration, channels, Canvas, workflows.
 
-### v2.0 (Complete) ✅
+---
 
-All 47 v2.0 requirements delivered — see MILESTONES.md for archive.
+## Architecture Overview
 
-### v2.1 Requirements (Active)
+### Current (v2.0-2.1)
+```
+Concept → Single Focus Group → Approval → Implementation
+                     └── One owner, one priority
+```
 
-#### Migration Logic Fix
-- [ ] **MIG-FIX-01**: Update migrate.md to map GSD Phases → WGSD Concepts (not Focus Groups)
-- [ ] **MIG-FIX-02**: Update migration-analyzer.md agent to suggest Concepts from Phases
-- [ ] **MIG-FIX-03**: Update planning-migrator.md to transform Phase content into Concept format
+### Target (v2.2)
+```
+Concept Directory → Multiple Focus Groups → Matrix Approval → Roadmap Branch
+      │                     │                      │               │
+      │                     │                      │               └── Implementations branch here
+      │                     │                      └── Each FG prioritizes independently
+      │                     └── Cross-cutting impact declarations
+      └── Multiple artifacts: CONCEPT.md, API-SPEC.md, wireframes/, etc.
+```
 
-#### Slack Channel Automation  
-- [ ] **SLACK-AUTO-01**: Auto-create {stub}-dev channel during migration
-- [ ] **SLACK-AUTO-02**: Auto-create {stub}-fg-{focus} channels for suggested Focus Groups
-- [ ] **SLACK-AUTO-03**: Auto-create {stub}-community channel (public) with roadmap Canvas
-- [ ] **SLACK-AUTO-04**: Integrate channel creation into migrate.md workflow
+---
 
-#### Approval Workflow
-- [ ] **APPROVE-01**: Generate migration preview showing all proposed changes
-- [ ] **APPROVE-02**: Display preview to user before any execution
-- [ ] **APPROVE-03**: Require explicit approval before migration proceeds
-- [ ] **APPROVE-04**: Allow user to modify suggestions before approval
+## Key Concepts Introduced
 
-### Out of Scope
+### Concept Directories
+Not just `concepts/oauth-integration.md` but full directories:
+```
+concepts/oauth-integration/
+├── CONCEPT.md              # Core concept description
+├── API-SPEC.md            # API specification  
+├── wireframes/            # Design artifacts
+├── acceptance-criteria.md # Detailed AC
+└── impact-matrix.md       # Which FGs, what priority per FG
+```
 
-- Direct Canvas editing by humans — AI manages all Canvas updates
-- Non-Slack platforms — Slack-native focus maintained
-- Multi-repository projects — single repo per WGSD project
+### Cross-Cutting Impact Matrix
+A single concept can impact multiple focus groups:
+```
+oauth-integration impacts:
+  - Core (P1): Authentication foundation
+  - API (P0): Breaking changes to auth endpoints
+  - Mobile (P2): SDK integration required
+  - Documentation (P1): New auth guide needed
+```
 
-## Context
+### Approval Matrix
+Each impacted focus group must approve independently:
+```
+┌─────────────────────────────────────────────────────────┐
+│ oauth-integration Approval Matrix                       │
+├──────────┬──────────┬──────────────┬──────────────────┤
+│ Focus    │ Priority │ Status       │ Approver         │
+├──────────┼──────────┼──────────────┼──────────────────┤
+│ Core     │ P1       │ ✅ Approved  │ @alice (2/23)    │
+│ API      │ P0       │ ⏳ Pending   │ Needs @bob       │
+│ Mobile   │ P2       │ ✅ Approved  │ @charlie (2/22)  │
+│ Docs     │ P1       │ 🚫 Blocked  │ Waiting on API   │
+└──────────┴──────────┴──────────────┴──────────────────┘
+```
 
-**v2.1 User Feedback:**
-Real-world migration attempt revealed three issues:
-1. **Mapping Error**: migrate.md incorrectly maps Phase → Focus Group (should be Phase → Concept)
-2. **Manual Slack Work**: User must manually create channels after migration
-3. **No Preview**: Migration executes immediately without user review/approval
+### Roadmap Branch
+```
+main
+├── develop (active development, implementations)
+├── roadmap (approved concepts ready for implementation)
+│   └── Concepts merge here when fully approved
+└── concepts/oauth-integration (concept development)
+    └── Merged to roadmap when approval matrix complete
+```
 
-**v2.0 Foundation:**
-- Complete WGSD v2.0 system with 47 requirements delivered
-- Migration wizard exists but has logic error in mapping
-- Channel infrastructure fully built but not integrated into migration
-- All approval patterns established in workflow engine
+### Implementation Flow (v2.2)
+```
+Concept Branch → Approval Matrix → Roadmap Branch → Implementation Branch → Develop → Main
+```
+
+### Emergency Hotfix Bypass
+```
+Emergency: develop → hotfix/fix-name → develop → main
+           (skip concept, skip roadmap, skip approval matrix)
+```
+
+---
 
 ## Constraints
 
-- **Quick Iteration**: Focused scope — fix issues, don't add features
-- **Backward Compatibility**: Existing workflows must continue working
-- **User Experience**: Approval step must be helpful, not annoying
-
-## Key Decisions
-
-| Decision | Rationale | Outcome |
-|----------|-----------|---------|
-| Phase → Concept mapping | Phases are specific work items, like Concepts (not thematic groups) | v2.1 |
-| Focus Groups are thematic | User defines Focus Groups; Concepts are derived from Phases | v2.1 |
-| Full Slack automation | Reduce manual work, ensure consistent channel structure | v2.1 |
-| Preview before execute | User confidence and ability to adjust suggestions | v2.1 |
+- **Slack-Native**: All approval workflows happen in Slack, not GitHub PRs
+- **AI-Managed Canvas**: Humans don't edit Canvas directly; AI keeps it in sync
+- **Backward Compatibility**: Existing simple concepts (single FG) still work
+- **Git-Based Truth**: Branch/file structure is authoritative, Canvas reflects it
 
 ---
-*Last updated: 2026-02-23 — Milestone v2.1 started*
+
+## Success Criteria
+
+1. Concept creates as directory with multiple artifacts
+2. Concept declares impact across multiple focus groups
+3. Each focus group can set independent priority
+4. Approval matrix tracks per-focus-group approval status
+5. Fully approved concepts merge to roadmap branch automatically
+6. Implementations branch from roadmap, not develop
+7. Canvas shows developer paths (branch, worktree)
+8. Emergency hotfixes bypass full approval matrix
+9. Conversational approvals work in Slack channels
+
+---
+
+## Out of Scope
+
+- GitHub PR-based approvals (Slack-native only)
+- Multi-repository concept spanning
+- Direct Canvas editing by humans
+- Non-Slack platforms
+
+---
+
+*Last updated: 2026-02-23 — Milestone v2.2 initialized*

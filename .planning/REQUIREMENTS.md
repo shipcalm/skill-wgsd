@@ -1,8 +1,8 @@
-# WGSD v2.1 Requirements
+# WGSD v2.2 Requirements
 
-**Milestone:** Migration Experience Improvements  
+**Milestone:** Matrix-Based Social Development Architecture  
 **Created:** 2026-02-23  
-**Source:** User feedback from real-world migration attempt
+**Source:** Architectural evolution for enterprise-scale social development
 
 ---
 
@@ -10,238 +10,575 @@
 
 | Category | Count | Priority |
 |----------|-------|----------|
-| Migration Logic Fix | 3 | P0 - Critical |
-| Slack Channel Automation | 4 | P1 - High |
-| Approval Workflow | 4 | P1 - High |
-| **Total** | **11** | — |
+| Concept Directory Architecture | 5 | P0 - Critical |
+| Cross-Cutting Impact System | 4 | P0 - Critical |
+| Matrix-Based Approval | 6 | P0 - Critical |
+| Roadmap Branch Architecture | 5 | P1 - High |
+| Slack-Native Approval Workflow | 5 | P1 - High |
+| Canvas Developer Info | 3 | P2 - Medium |
+| Emergency Hotfix Bypass | 3 | P2 - Medium |
+| **Total** | **31** | — |
 
 ---
 
-## Migration Logic Fix (P0 - Critical)
+## Phase 10: Concept Directory Architecture (P0 - Critical)
 
-The current migration incorrectly maps GSD Phases to WGSD Focus Groups. Phases are specific work items with defined scope and tasks — they should map to Concepts, not Focus Groups.
+Transform concepts from single markdown files to full directories with multiple artifacts.
 
-**Correct Mapping:**
-- GSD Phase → WGSD Concept (specific deliverable)
-- Focus Groups are thematic containers defined by user (e.g., "Core", "Migration", "Channels")
-- Requirements stay as requirements
+### CONCEPT-DIR-01: Create Concept as Directory
 
-### MIG-FIX-01: Update migrate.md Workflow
-
-**As a** user migrating from GSD  
-**I want** Phases to become Concepts  
-**So that** the semantic meaning is preserved correctly
+**As a** user creating a new concept  
+**I want** a directory created instead of a single .md file  
+**So that** I can store multiple related artifacts
 
 **Acceptance Criteria:**
-- [ ] migrate.md maps Phase N → Concept (not Focus Group)
-- [ ] Focus Group suggestions are thematic groupings, not 1:1 from phases
-- [ ] Existing migration steps updated with correct terminology
+- [ ] `create-concept` workflow creates `concepts/{name}/` directory
+- [ ] Directory structure includes CONCEPT.md as primary file
+- [ ] Existing single-file concepts continue to work (backward compat)
 
-**Files:** `workflows/migrate.md`
+**Files:** `workflows/create-concept.md` (new or modified)
 
 ---
 
-### MIG-FIX-02: Update migration-analyzer.md Agent
+### CONCEPT-DIR-02: Concept Directory Structure Template
 
-**As a** user running migration analysis  
-**I want** the analyzer to suggest Concepts from Phases  
-**So that** the migration preview shows correct mappings
+**As a** developer working on a concept  
+**I want** a standard directory structure  
+**So that** artifacts are organized consistently
 
 **Acceptance Criteria:**
-- [ ] Agent output includes `suggested_concepts[]` (not focus groups)
-- [ ] Agent suggests thematic Focus Groups separately
-- [ ] Agent explains Concept derivation from Phase content
+- [ ] Template includes: CONCEPT.md, impact-matrix.md
+- [ ] Optional artifacts supported: API-SPEC.md, wireframes/, acceptance-criteria.md
+- [ ] Template is customizable via config
 
-**Files:** `agents/migration-analyzer.md`
+**Files:** `templates/concept-directory/` (new)
 
 ---
 
-### MIG-FIX-03: Update planning-migrator.md Agent
+### CONCEPT-DIR-03: Independent Concept Branches
 
-**As a** user completing migration  
-**I want** Phase content transformed to Concept format  
-**So that** migrated content matches WGSD structure
+**As a** concept author  
+**I want** concepts developed on independent branches  
+**So that** work can happen in parallel without conflicts
 
 **Acceptance Criteria:**
-- [ ] Agent transforms Phase description → Concept description
-- [ ] Agent maps Phase requirements → Concept acceptance criteria
-- [ ] Agent assigns Concepts to appropriate Focus Groups
+- [ ] New concepts create `concepts/{name}` branch
+- [ ] Branch contains concept directory at `concepts/{name}/`
+- [ ] Multiple concept branches can exist simultaneously
 
-**Files:** `agents/planning-migrator.md`
+**Files:** `workflows/lib/branch-ops.md`, `workflows/create-concept.md`
 
 ---
 
-## Slack Channel Automation (P1 - High)
+### CONCEPT-DIR-04: Concept Worktree Support
 
-Currently migration completes but leaves user to manually create all Slack channels. The migration should auto-create the full channel structure.
-
-### SLACK-AUTO-01: Auto-Create Core Dev Channel
-
-**As a** user completing migration  
-**I want** {stub}-dev channel created automatically  
-**So that** I don't need manual setup
+**As a** developer  
+**I want** optional git worktree setup for concept branches  
+**So that** I can work on multiple concepts simultaneously
 
 **Acceptance Criteria:**
-- [ ] Private channel {stub}-dev created
-- [ ] Channel has master dashboard Canvas
-- [ ] User is added as channel member
+- [ ] Optional worktree creation at `worktrees/{concept-name}/`
+- [ ] Worktree path surfaced in Canvas
+- [ ] Cleanup handles worktree removal on concept completion
 
-**Files:** `workflows/migrate.md`, `workflows/lib/slack-api.md`
+**Files:** `workflows/lib/git-ops.md`, `workflows/create-concept.md`
 
 ---
 
-### SLACK-AUTO-02: Auto-Create Focus Group Channels
+### CONCEPT-DIR-05: Multi-Artifact Concept Sync
 
-**As a** user completing migration  
-**I want** {stub}-fg-{focus} channels created for each Focus Group  
-**So that** the full channel structure is ready
+**As a** Canvas viewer  
+**I want** to see all concept artifacts  
+**So that** I have full visibility into concept scope
 
 **Acceptance Criteria:**
-- [ ] Private channel created per Focus Group
-- [ ] Each channel has appropriate Canvas
-- [ ] User is added as member to all channels
+- [ ] Canvas lists all files in concept directory
+- [ ] Primary artifacts (CONCEPT.md, impact-matrix.md) displayed inline
+- [ ] Secondary artifacts linked
 
-**Files:** `workflows/migrate.md`
+**Files:** `workflows/canvas-sync.md`, `workflows/lib/canvas-templates.md`
 
 ---
 
-### SLACK-AUTO-03: Auto-Create Community Channel
+## Phase 11: Cross-Cutting Impact System (P0 - Critical)
 
-**As a** user completing migration  
-**I want** {stub}-community channel created  
-**So that** community integration is ready
+Enable concepts to declare and track impact across multiple focus groups.
+
+### IMPACT-01: Impact Matrix File Format
+
+**As a** concept author  
+**I want** a structured way to declare focus group impacts  
+**So that** stakeholders know what's affected
 
 **Acceptance Criteria:**
-- [ ] Public channel {stub}-community created
-- [ ] Channel has roadmap Canvas
-- [ ] Community channels follow security model
+- [ ] `impact-matrix.md` format defined with YAML frontmatter
+- [ ] Supports multiple focus groups with per-group priority
+- [ ] Includes impact description per focus group
 
-**Files:** `workflows/migrate.md`
+**Example Format:**
+```yaml
+---
+concept: oauth-integration
+impacts:
+  - focus_group: core
+    priority: P1
+    impact: "Authentication foundation changes"
+  - focus_group: api
+    priority: P0
+    impact: "Breaking changes to auth endpoints"
+---
+```
+
+**Files:** `templates/concept-directory/impact-matrix.md`
 
 ---
 
-### SLACK-AUTO-04: Integrate Channel Creation into Migration Flow
+### IMPACT-02: Impact Declaration Workflow
 
-**As a** migration workflow  
-**I want** channel creation to happen at the right step  
-**So that** migration is a single cohesive operation
+**As a** concept author  
+**I want** an interactive way to declare impacts  
+**So that** I don't miss affected stakeholders
 
 **Acceptance Criteria:**
-- [ ] Channel creation happens after approval, before completion
-- [ ] Failures are handled gracefully with rollback
-- [ ] Success/failure reported in migration summary
+- [ ] Workflow prompts for affected focus groups
+- [ ] Suggests priorities based on impact type
+- [ ] Generates impact-matrix.md from inputs
 
-**Files:** `workflows/migrate.md`
+**Files:** `workflows/declare-impact.md` (new)
 
 ---
 
-## Approval Workflow (P1 - High)
+### IMPACT-03: Automatic Focus Group Notifications
 
-Currently migration executes immediately without user review. Users need to see what will happen and approve before execution.
-
-### APPROVE-01: Generate Migration Preview
-
-**As a** user starting migration  
-**I want** a complete preview of proposed changes  
-**So that** I understand what will happen
+**As a** focus group lead  
+**I want** notification when a concept impacts my group  
+**So that** I can track and prioritize
 
 **Acceptance Criteria:**
-- [ ] Preview shows: Focus Groups to create
-- [ ] Preview shows: Concepts to create (with source Phase)
-- [ ] Preview shows: Channels to create
-- [ ] Preview shows: Files to transform
+- [ ] Slack message sent to {stub}-fg-{name} channel
+- [ ] Message includes concept name, declared priority, impact description
+- [ ] Message includes approval action prompt
 
-**Files:** `workflows/migrate.md`
+**Files:** `workflows/lib/slack-api.md`, `workflows/declare-impact.md`
 
 ---
 
-### APPROVE-02: Display Preview to User
+### IMPACT-04: Impact Change Tracking
 
-**As a** user viewing migration preview  
-**I want** clear, formatted preview output  
-**So that** I can easily understand the plan
+**As a** stakeholder  
+**I want** to be notified when concept impacts change  
+**So that** I can update my prioritization
 
 **Acceptance Criteria:**
-- [ ] Preview uses clear section headers
-- [ ] Preview shows mapping (Phase X → Concept Y)
-- [ ] Preview shows channel names that will be created
-- [ ] Preview is conversational, not just data dump
+- [ ] Impact changes (add/remove FG, priority change) trigger notifications
+- [ ] Change history tracked in concept directory
+- [ ] Canvas updated with impact changes
 
-**Files:** `workflows/migrate.md`
+**Files:** `workflows/update-impact.md` (new)
 
 ---
 
-### APPROVE-03: Require Explicit Approval
+## Phase 12: Matrix-Based Approval (P0 - Critical)
 
-**As a** user reviewing migration  
-**I want** to explicitly approve before execution  
-**So that** I have control over the process
+Transform approval from single owner to multi-stakeholder matrix.
+
+### MATRIX-01: Approval Matrix Data Structure
+
+**As a** system  
+**I want** a structured approval matrix per concept  
+**So that** multi-stakeholder approval is trackable
 
 **Acceptance Criteria:**
-- [ ] Migration pauses after preview display
-- [ ] User must confirm to proceed
-- [ ] "No" response aborts migration cleanly
-- [ ] Approval is logged in migration output
+- [ ] Approval matrix stored in concept directory
+- [ ] Tracks: focus_group, priority, status, approver, timestamp
+- [ ] Status enum: pending, approved, rejected, blocked
 
-**Files:** `workflows/migrate.md`
+**Files:** `concepts/{name}/approval-matrix.json`
 
 ---
 
-### APPROVE-04: Allow Modification Before Approval
+### MATRIX-02: Per-Focus-Group Approval
 
-**As a** user reviewing migration preview  
-**I want** to modify suggestions before approval  
-**So that** I can customize the migration
+**As a** focus group representative  
+**I want** to approve my group's involvement independently  
+**So that** I don't block other groups
 
 **Acceptance Criteria:**
-- [ ] User can rename Focus Groups
-- [ ] User can reassign Concepts to different Focus Groups
-- [ ] User can exclude certain Phases from migration
-- [ ] Changes are reflected in updated preview
+- [ ] Approval scoped to single focus group
+- [ ] Other groups' approvals unaffected
+- [ ] Partial approval state visible in Canvas
 
-**Files:** `workflows/migrate.md`
+**Files:** `workflows/lib/approval-system.md`
+
+---
+
+### MATRIX-03: Approval Matrix Canvas Widget
+
+**As a** viewer  
+**I want** to see approval matrix status at a glance  
+**So that** I know what's blocking progress
+
+**Acceptance Criteria:**
+- [ ] Canvas shows approval matrix table
+- [ ] Color-coded status (green=approved, yellow=pending, red=rejected)
+- [ ] Shows approver and timestamp for completed approvals
+
+**Files:** `workflows/lib/canvas-templates.md`
+
+---
+
+### MATRIX-04: Approval Completion Detection
+
+**As a** system  
+**I want** to detect when all required approvals are complete  
+**So that** automated advancement can trigger
+
+**Acceptance Criteria:**
+- [ ] "Fully approved" state detected when all FGs approved
+- [ ] Triggers roadmap merge workflow
+- [ ] Handles optional vs required approval distinctions
+
+**Files:** `workflows/lib/approval-system.md`
+
+---
+
+### MATRIX-05: Blocked Status Handling
+
+**As a** focus group  
+**I want** to mark my approval as blocked  
+**So that** dependencies are visible
+
+**Acceptance Criteria:**
+- [ ] "Blocked" status with blocking reason
+- [ ] Can specify blocking focus group
+- [ ] Unblock triggers when blocker approves
+
+**Files:** `workflows/lib/approval-system.md`
+
+---
+
+### MATRIX-06: Approval Override (Admin)
+
+**As an** admin  
+**I want** to override stuck approvals  
+**So that** progress isn't blocked indefinitely
+
+**Acceptance Criteria:**
+- [ ] Admin can force-approve with reason
+- [ ] Override logged and visible in audit trail
+- [ ] Original approver notified of override
+
+**Files:** `workflows/approval-override.md` (new)
+
+---
+
+## Phase 13: Roadmap Branch Architecture (P1 - High)
+
+Establish roadmap branch as the source of truth for approved concepts.
+
+### ROADMAP-01: Roadmap Branch Creation
+
+**As a** WGSD project  
+**I want** a roadmap branch created  
+**So that** approved concepts have a landing place
+
+**Acceptance Criteria:**
+- [ ] `roadmap` branch created from main
+- [ ] Branch protected from direct pushes
+- [ ] Only approved concepts merged
+
+**Files:** `workflows/init.md`, `workflows/lib/branch-ops.md`
+
+---
+
+### ROADMAP-02: Automatic Concept → Roadmap Merge
+
+**As a** concept  
+**When** fully approved  
+**I want** automatic merge to roadmap branch  
+**So that** advancement is seamless
+
+**Acceptance Criteria:**
+- [ ] Approval completion triggers merge workflow
+- [ ] Concept directory merged to roadmap branch
+- [ ] Concept branch archived (not deleted)
+- [ ] Slack notification sent
+
+**Files:** `workflows/promote-concept.md`
+
+---
+
+### ROADMAP-03: Implementation Branches from Roadmap
+
+**As a** developer starting implementation  
+**I want** to branch from roadmap  
+**So that** I have all approved concepts available
+
+**Acceptance Criteria:**
+- [ ] Implementation workflow branches from `roadmap` not `develop`
+- [ ] Develop branch rebased on roadmap periodically
+- [ ] Clear documentation on branching model
+
+**Files:** `workflows/create-implementation.md`
+
+---
+
+### ROADMAP-04: Roadmap Canvas View
+
+**As a** stakeholder  
+**I want** to see roadmap contents in Canvas  
+**So that** I know what's approved and pending implementation
+
+**Acceptance Criteria:**
+- [ ] Canvas shows concepts on roadmap branch
+- [ ] Implementation status per concept visible
+- [ ] Priority sorting within roadmap view
+
+**Files:** `workflows/lib/canvas-templates.md`
+
+---
+
+### ROADMAP-05: Roadmap Sync to Develop
+
+**As a** developer  
+**I want** roadmap changes synced to develop  
+**So that** I'm working with latest approved concepts
+
+**Acceptance Criteria:**
+- [ ] Periodic or on-demand sync from roadmap → develop
+- [ ] Conflicts handled with human review
+- [ ] Sync status visible in dev Canvas
+
+**Files:** `workflows/roadmap-sync.md` (new)
+
+---
+
+## Phase 14: Slack-Native Approval Workflow (P1 - High)
+
+Conversational approvals in Slack channels without GitHub PRs.
+
+### SLACK-APPROVE-01: Conversational Approval Prompts
+
+**As a** focus group member  
+**I want** approval prompts in my channel  
+**So that** I can approve without leaving Slack
+
+**Acceptance Criteria:**
+- [ ] Approval request posted to focus group channel
+- [ ] Includes concept summary, impact, priority
+- [ ] "Approve" / "Reject" / "Needs Discussion" reactions or commands
+
+**Files:** `workflows/lib/approval-system.md`, `workflows/lib/slack-api.md`
+
+---
+
+### SLACK-APPROVE-02: Approval via Slash Command
+
+**As a** focus group lead  
+**I want** to approve via `/wgsd approve {concept}`  
+**So that** I can approve quickly
+
+**Acceptance Criteria:**
+- [ ] `/wgsd approve {concept}` command accepted
+- [ ] Validates user has approval authority for focus group
+- [ ] Updates approval matrix
+- [ ] Confirms in channel
+
+**Files:** `workflows/conversational-approve.md` (new)
+
+---
+
+### SLACK-APPROVE-03: Discussion Thread for Approval
+
+**As a** focus group  
+**I want** to discuss concept before approving  
+**So that** concerns are addressed
+
+**Acceptance Criteria:**
+- [ ] Approval prompt creates or links to discussion thread
+- [ ] Discussion visible to concept author
+- [ ] Author can respond to concerns
+
+**Files:** `workflows/lib/slack-api.md`
+
+---
+
+### SLACK-APPROVE-04: Approval Status Summary
+
+**As a** concept author  
+**I want** a summary of approval status  
+**So that** I know what's blocking
+
+**Acceptance Criteria:**
+- [ ] `/wgsd status {concept}` shows approval matrix
+- [ ] Highlights pending and blocked approvals
+- [ ] Suggests next actions
+
+**Files:** `workflows/concept-status.md` (new)
+
+---
+
+### SLACK-APPROVE-05: Rejection with Feedback
+
+**As a** focus group  
+**I want** to reject with feedback  
+**So that** the author knows what to fix
+
+**Acceptance Criteria:**
+- [ ] Rejection requires reason
+- [ ] Reason posted to dev channel
+- [ ] Concept author notified
+- [ ] Concept returns to draft status
+
+**Files:** `workflows/lib/approval-system.md`
+
+---
+
+## Phase 15: Canvas Developer Info (P2 - Medium)
+
+Show developers the git information they need.
+
+### CANVAS-DEV-01: Display Current Branch
+
+**As a** developer viewing Canvas  
+**I want** to see the git branch  
+**So that** I know what I'm looking at
+
+**Acceptance Criteria:**
+- [ ] Canvas header includes branch name
+- [ ] Updates when viewing different concepts
+- [ ] Clear visual distinction
+
+**Files:** `workflows/lib/canvas-templates.md`
+
+---
+
+### CANVAS-DEV-02: Display Worktree Path
+
+**As a** developer with multiple worktrees  
+**I want** to see the worktree path  
+**So that** I can navigate quickly
+
+**Acceptance Criteria:**
+- [ ] Worktree path shown when applicable
+- [ ] Copy-able path format
+- [ ] "No worktree" indicator when not set up
+
+**Files:** `workflows/lib/canvas-templates.md`
+
+---
+
+### CANVAS-DEV-03: Git Status Quick Reference
+
+**As a** developer  
+**I want** basic git status in Canvas  
+**So that** I have context without terminal
+
+**Acceptance Criteria:**
+- [ ] Shows: branch, clean/dirty, ahead/behind
+- [ ] Last commit summary
+- [ ] Quick-action suggestions
+
+**Files:** `workflows/canvas-sync.md`
+
+---
+
+## Phase 16: Emergency Hotfix Bypass (P2 - Medium)
+
+Allow urgent fixes to bypass approval matrix.
+
+### HOTFIX-01: Emergency Hotfix Workflow
+
+**As a** developer with urgent fix  
+**I want** to bypass concept/approval process  
+**So that** critical issues are fixed fast
+
+**Acceptance Criteria:**
+- [ ] `/wgsd hotfix start {name}` creates hotfix branch from develop
+- [ ] No concept, no approval matrix required
+- [ ] Clear marking as emergency bypass
+
+**Files:** `workflows/emergency-hotfix.md` (new)
+
+---
+
+### HOTFIX-02: Hotfix Completion and Merge
+
+**As a** developer completing hotfix  
+**I want** fast merge to develop and main  
+**So that** fix is deployed quickly
+
+**Acceptance Criteria:**
+- [ ] Hotfix merges to develop directly
+- [ ] Option to fast-track to main
+- [ ] Audit trail maintained
+
+**Files:** `workflows/emergency-hotfix.md`
+
+---
+
+### HOTFIX-03: Post-Hotfix Concept Creation
+
+**As a** project maintainer  
+**I want** hotfixes tracked retroactively  
+**So that** documentation is complete
+
+**Acceptance Criteria:**
+- [ ] Optional: create concept from completed hotfix
+- [ ] Concept created as "implemented" status
+- [ ] Linked to hotfix commits
+
+**Files:** `workflows/emergency-hotfix.md`
 
 ---
 
 ## Traceability Matrix
 
-| Requirement | Phase | Files Affected |
-|-------------|-------|----------------|
-| MIG-FIX-01 | 7 | workflows/migrate.md |
-| MIG-FIX-02 | 7 | agents/migration-analyzer.md |
-| MIG-FIX-03 | 7 | agents/planning-migrator.md |
-| SLACK-AUTO-01 | 8 | workflows/migrate.md |
-| SLACK-AUTO-02 | 8 | workflows/migrate.md |
-| SLACK-AUTO-03 | 8 | workflows/migrate.md |
-| SLACK-AUTO-04 | 8 | workflows/migrate.md |
-| APPROVE-01 | 9 | workflows/migrate.md |
-| APPROVE-02 | 9 | workflows/migrate.md |
-| APPROVE-03 | 9 | workflows/migrate.md |
-| APPROVE-04 | 9 | workflows/migrate.md |
+| Phase | Requirements | Files Affected |
+|-------|--------------|----------------|
+| 10 | CONCEPT-DIR-01 to 05 | workflows/create-concept.md, templates/concept-directory/, workflows/lib/branch-ops.md, workflows/lib/git-ops.md, workflows/canvas-sync.md |
+| 11 | IMPACT-01 to 04 | templates/concept-directory/impact-matrix.md, workflows/declare-impact.md, workflows/lib/slack-api.md, workflows/update-impact.md |
+| 12 | MATRIX-01 to 06 | workflows/lib/approval-system.md, workflows/lib/canvas-templates.md, workflows/approval-override.md |
+| 13 | ROADMAP-01 to 05 | workflows/init.md, workflows/lib/branch-ops.md, workflows/promote-concept.md, workflows/create-implementation.md, workflows/roadmap-sync.md |
+| 14 | SLACK-APPROVE-01 to 05 | workflows/lib/approval-system.md, workflows/lib/slack-api.md, workflows/conversational-approve.md, workflows/concept-status.md |
+| 15 | CANVAS-DEV-01 to 03 | workflows/lib/canvas-templates.md, workflows/canvas-sync.md |
+| 16 | HOTFIX-01 to 03 | workflows/emergency-hotfix.md |
 
 ---
 
 ## Dependencies
 
 ```
-Phase 7 (Logic Fix) ─────────┐
-                             ├──► Phase 9 (Approval)
-Phase 8 (Slack Automation) ──┘
-```
+Phase 10 (Concept Directories) ─────┐
+                                    ├──► Phase 12 (Matrix Approval)
+Phase 11 (Cross-Cutting Impact) ────┤
+                                    │
+                                    └──► Phase 14 (Slack Approval)
 
-**Phase 7** and **Phase 8** can run in parallel.  
-**Phase 9** depends on both (approval shows correct mappings + channel names).
+Phase 12 (Matrix Approval) ─────────┐
+                                    ├──► Phase 13 (Roadmap Branch)
+Phase 14 (Slack Approval) ──────────┘
+
+Phase 13 (Roadmap Branch) ──────────► Phase 15 (Canvas Dev Info)
+
+Phase 16 (Emergency Hotfix) ────────► Independent (can start after Phase 10)
+```
 
 ---
 
 ## Definition of Done
 
-- [ ] All 11 requirements implemented
-- [ ] migrate.md correctly maps Phase → Concept
-- [ ] All Slack channels auto-created
-- [ ] User sees preview and approves before execution
-- [ ] End-to-end migration tested successfully
+- [ ] All 31 requirements implemented
+- [ ] Concepts are directories with multiple artifacts
+- [ ] Cross-cutting impacts declared and tracked
+- [ ] Matrix-based approval working per focus group
+- [ ] Roadmap branch receives approved concepts
+- [ ] Implementations branch from roadmap
+- [ ] Slack-native approvals functional
+- [ ] Canvas shows developer git info
+- [ ] Emergency hotfix bypass operational
+- [ ] Full end-to-end test with multi-FG concept
 
 ---
 
-*Requirements document for WGSD v2.1 — Migration Experience Improvements*
+*Requirements document for WGSD v2.2 — Matrix-Based Social Development Architecture*
