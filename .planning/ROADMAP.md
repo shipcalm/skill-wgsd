@@ -483,3 +483,45 @@ Migration workflow automatically creates and populates all essential roadmap can
 - **Content:** Populate from current `.planning/` roadmap data
 - **Error Handling:** Non-fatal failures with manual fallback documentation
 
+
+---
+
+## Phase 19: Canvas Auto-Sync Implementation
+
+**Dependencies:** Canvas infrastructure (existing)  
+**Estimated Effort:** 6-8 hours  
+**Priority:** High (missing core feature)  
+**Status:** 🔵 Planned  
+
+### Problem
+
+WGSD canvas sync is entirely manual despite extensive documentation suggesting automatic triggers should exist. Throughout the codebase, canvas sync calls are commented out with "would invoke" statements.
+
+**Impact:** Created canvases become stale immediately after planning changes, defeating the purpose of live visual collaboration.
+
+### Requirements
+
+| ID | Requirement | Priority |
+|----|-------------|----------|
+| REQ-19-01 | Automatic concept merge sync to focus group + master canvases | Must Have |
+| REQ-19-02 | Automatic branch update sync for focus group changes | Must Have |  
+| REQ-19-03 | Automatic implementation state sync for dashboard updates | Must Have |
+| REQ-19-04 | Automatic approval matrix sync for focus group canvases | Should Have |
+| REQ-19-05 | Manual override capability preserved | Must Have |
+| REQ-19-06 | Sync failure resilience (non-blocking) | Must Have |
+
+### Success Criteria
+
+Canvas content stays current automatically without manual intervention. All commented "would invoke" statements replaced with actual working sync calls.
+
+### Implementation Notes
+
+- **Pattern:** Replace `# Would invoke canvas-sync` with actual `/wgsd sync-canvas` calls
+- **Locations:** 8+ files with commented sync triggers need implementation
+- **Risk Mitigation:** Non-blocking calls, error logging, async execution
+- **Testing:** Verify canvas updates on concept merges, branch changes, implementation state changes
+
+### Evidence
+
+Marvin migration revealed this bug - 7 canvases created but won't update automatically when concepts change or branches are updated.
+
