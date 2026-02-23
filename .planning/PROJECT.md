@@ -1,90 +1,89 @@
-# WGSD v2.0 - Social Development Operating System
+# WGSD v2.1 - Migration Experience Improvements
 
 ## What This Is
 
-A comprehensive enhancement to the WGSD (We Get Shit Done) skill that transforms individual GSD projects into collaborative social development platforms. It provides intelligent migration from GSD to WGSD, creates structured channel infrastructure with AI-managed Canvas integration, and enables seamless community feedback → development pipelines through Slack-native collaborative workflows.
+A focused iteration on the WGSD migration system based on real-world user feedback. Addresses migration logic errors, adds Slack channel automation, and introduces interactive approval workflow for safer migrations.
 
 ## Core Value
 
-Enable effortless transition from individual development (GSD) to social collaborative development (WGSD) while maintaining development velocity and creating transparent community engagement.
+Make GSD → WGSD migration bulletproof with correct mapping logic, full automation, and user confidence through interactive approval before execution.
+
+---
+
+## Current Milestone: v2.1 Migration Experience Improvements
+
+**Goal:** Fix migration logic, automate Slack channels, add approval step
+
+**Target features:**
+- Correct Phase → Concept mapping (not Focus Group)
+- Auto-create all WGSD Slack channels during migration
+- Interactive preview/approval before migration execution
+
+---
+
+## Previous: v2.0 - Social Development Operating System
+
+Comprehensive enhancement that transforms individual GSD projects into collaborative social development platforms. Provides intelligent migration from GSD to WGSD, creates structured channel infrastructure with AI-managed Canvas integration, and enables seamless community feedback → development pipelines through Slack-native collaborative workflows.
 
 ## Requirements
 
-### Validated
+### v2.0 (Complete) ✅
 
-- ✓ Basic WGSD methodology (Focus Groups → Concepts → Implementations) — existing
-- ✓ Workflow system architecture with SKILL.md routing — existing  
-- ✓ Slack Canvas integration via conversations.canvases.create API — existing
-- ✓ Repository structure with .planning/ directory — existing
+All 47 v2.0 requirements delivered — see MILESTONES.md for archive.
 
-### Active
+### v2.1 Requirements (Active)
 
-- [ ] **MIGRATE-01**: Intelligent GSD → WGSD migration wizard with current state detection
-- [ ] **MIGRATE-02**: Automated focus group suggestions from existing GSD roadmap analysis
-- [ ] **MIGRATE-03**: Work-in-progress preservation as active implementations
-- [ ] **MIGRATE-04**: Team communication drafting and transition announcement
-- [ ] **CHANNEL-01**: Standardized channel naming convention ({stub}-dev, {stub}-fg-{focus}, etc.)
-- [ ] **CHANNEL-02**: Automated private channel creation and management
-- [ ] **CHANNEL-03**: Public community channel setup with roadmap Canvas
-- [ ] **CANVAS-01**: AI-managed Canvas updates (no direct human editing)
-- [ ] **CANVAS-02**: Master dashboard Canvas in core dev channel
-- [ ] **CANVAS-03**: Cross-channel Canvas synchronization with planning files
-- [ ] **WORKFLOW-01**: Two-track development (collaborative planning, trunk-based implementation)
-- [ ] **WORKFLOW-02**: Focus group approval gates for concept maturation
-- [ ] **WORKFLOW-03**: Implementation ownership assignment and prioritization
-- [ ] **COMMUNITY-01**: Public feedback collection and moderation triage
-- [ ] **COMMUNITY-02**: Community contributor invitation to private channels
-- [ ] **COMMUNITY-03**: Access request system for interested community members
-- [ ] **INTEGRATE-01**: Workspace management (wgsd/{project} structure)
-- [ ] **INTEGRATE-02**: Branch strategy enforcement (develop base, clean checkouts)
-- [ ] **INTEGRATE-03**: Planning artifact migration from GSD to WGSD structure
+#### Migration Logic Fix
+- [ ] **MIG-FIX-01**: Update migrate.md to map GSD Phases → WGSD Concepts (not Focus Groups)
+- [ ] **MIG-FIX-02**: Update migration-analyzer.md agent to suggest Concepts from Phases
+- [ ] **MIG-FIX-03**: Update planning-migrator.md to transform Phase content into Concept format
+
+#### Slack Channel Automation  
+- [ ] **SLACK-AUTO-01**: Auto-create {stub}-dev channel during migration
+- [ ] **SLACK-AUTO-02**: Auto-create {stub}-fg-{focus} channels for suggested Focus Groups
+- [ ] **SLACK-AUTO-03**: Auto-create {stub}-community channel (public) with roadmap Canvas
+- [ ] **SLACK-AUTO-04**: Integrate channel creation into migrate.md workflow
+
+#### Approval Workflow
+- [ ] **APPROVE-01**: Generate migration preview showing all proposed changes
+- [ ] **APPROVE-02**: Display preview to user before any execution
+- [ ] **APPROVE-03**: Require explicit approval before migration proceeds
+- [ ] **APPROVE-04**: Allow user to modify suggestions before approval
 
 ### Out of Scope
 
-- Direct Canvas editing by humans — AI manages all Canvas updates through conversation
-- Support for non-Slack collaboration platforms — focus on Slack-native experience initially
-- Multi-repository WGSD projects — one repository per WGSD project for v1
-- Automated implementation assignment — requires human decision for ownership
-- Public channel support — all development channels remain private for security
+- Direct Canvas editing by humans — AI manages all Canvas updates
+- Non-Slack platforms — Slack-native focus maintained
+- Multi-repository projects — single repo per WGSD project
 
 ## Context
 
-**Current WGSD State:**
-- Functional three-tier architecture with basic workflows
-- Slack Canvas integration working via exec + API calls
-- 6 core workflows implemented (create-focus-group, create-concept, etc.)
-- Codebase mapped with 7 analysis documents showing skill-based architecture
+**v2.1 User Feedback:**
+Real-world migration attempt revealed three issues:
+1. **Mapping Error**: migrate.md incorrectly maps Phase → Focus Group (should be Phase → Concept)
+2. **Manual Slack Work**: User must manually create channels after migration
+3. **No Preview**: Migration executes immediately without user review/approval
 
-**Migration Challenge:**
-- The github/marvin project is currently running on GSD mid-phase
-- Need seamless migration path that preserves work-in-progress
-- Team needs to transition from individual to collaborative development
-- Existing GSD planning artifacts contain valuable roadmap and requirements data
-
-**Strategic Vision:**
-- Transform WGSD into the definitive collaborative development methodology
-- Enable customer-driven development through community integration
-- Maintain development velocity while adding social collaboration
-- Create reusable migration pattern for other GSD projects
+**v2.0 Foundation:**
+- Complete WGSD v2.0 system with 47 requirements delivered
+- Migration wizard exists but has logic error in mapping
+- Channel infrastructure fully built but not integrated into migration
+- All approval patterns established in workflow engine
 
 ## Constraints
 
-- **Slack API**: Private channels only — security requirement for internal development
-- **Git Strategy**: Must support clean develop branch checkout while preserving GSD state
-- **Canvas Management**: AI-only updates to prevent inconsistency and chaos
-- **Concurrent Implementations**: Natural scaling (~1 per focus group) to prevent conflicts
-- **Team Size**: System must work for both small teams (2-3) and larger teams (10+)
+- **Quick Iteration**: Focused scope — fix issues, don't add features
+- **Backward Compatibility**: Existing workflows must continue working
+- **User Experience**: Approval step must be helpful, not annoying
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| AI-managed Canvas only | Prevents chaos and maintains consistency across focus groups | — Pending |
-| Two-track development model | Separates collaborative planning from trunk-based implementation | — Pending |
-| Private channels for development | Internal company security requirements | — Pending |
-| Standardized {stub}- naming | Instant recognition and easy project discovery | — Pending |
-| Community → development pipeline | Customer-driven feature development and transparency | — Pending |
-| GSD migration wizard | Enables existing projects to adopt WGSD methodology | — Pending |
+| Phase → Concept mapping | Phases are specific work items, like Concepts (not thematic groups) | v2.1 |
+| Focus Groups are thematic | User defines Focus Groups; Concepts are derived from Phases | v2.1 |
+| Full Slack automation | Reduce manual work, ensure consistent channel structure | v2.1 |
+| Preview before execute | User confidence and ability to adjust suggestions | v2.1 |
 
 ---
-*Last updated: 2026-02-22 after comprehensive requirements gathering*
+*Last updated: 2026-02-23 — Milestone v2.1 started*

@@ -1,138 +1,247 @@
-# WGSD v2.0 Requirements
+# WGSD v2.1 Requirements
 
-## v1 Requirements
+**Milestone:** Migration Experience Improvements  
+**Created:** 2026-02-23  
+**Source:** User feedback from real-world migration attempt
 
-### Migration System
-- [ ] **MIGRATE-01**: Detect GSD project state (current branch, phase, uncommitted work, clean migration requirements) → **Phase 2**
-- [ ] **MIGRATE-02**: Analyze existing GSD roadmap phases to suggest intelligent focus group mappings → **Phase 2**
-- [ ] **MIGRATE-03**: Analyze codebase structure to suggest additional focus groups (e.g., /api → API focus group) → **Phase 2**
-- [ ] **MIGRATE-04**: Preserve work-in-progress by converting current phase to active implementation → **Phase 2**
-- [ ] **MIGRATE-05**: Auto-generate implementation names based on current phase/branch (e.g., mvn-impl-auth-v2) → **Phase 2**
-- [ ] **MIGRATE-06**: Create wgsd/{project} workspace with clean develop branch checkout → **Phase 2**
-- [ ] **MIGRATE-07**: Migrate GSD planning artifacts (.planning/ROADMAP.md → focus group structure) → **Phase 2**
-- [ ] **MIGRATE-08**: Draft team communication announcement for GSD → WGSD transition → **Phase 2**
+---
 
-### Channel Infrastructure
-- [ ] **CHANNEL-01**: Ask for repo slack stub during setup (e.g., "mvn" for marvin project) → **Phase 1**
-- [ ] **CHANNEL-02**: Create standardized channel naming convention implementation → **Phase 1**
-- [ ] **CHANNEL-03**: Auto-create core dev channel ({stub}-dev) as private channel → **Phase 3**
-- [ ] **CHANNEL-04**: Auto-create public community channel ({stub}-community) for customer feedback → **Phase 3**
-- [ ] **CHANNEL-05**: Auto-create focus group channels ({stub}-fg-{name}) as private channels → **Phase 3**
-- [ ] **CHANNEL-06**: Auto-create concept channels ({stub}-cpt-{name}) as private channels → **Phase 3**
-- [ ] **CHANNEL-07**: Auto-create implementation channels ({stub}-impl-{name}) as private channels → **Phase 3**
-- [ ] **CHANNEL-08**: Implement channel lifecycle management (creation, archival, cleanup) → **Phase 3**
+## Overview
 
-### Canvas Management System
-- [ ] **CANVAS-01**: Create master dashboard Canvas in core dev channel with WGSD methodology guide → **Phase 4**
-- [ ] **CANVAS-02**: Implement live roadmap visualization showing all focus groups, concepts, implementations → **Phase 4**
-- [ ] **CANVAS-03**: Auto-update master Canvas when focus groups, concepts, or implementations change state → **Phase 4**
-- [ ] **CANVAS-04**: Create focus group Canvas populated from migrated GSD planning docs → **Phase 4**
-- [ ] **CANVAS-05**: Implement AI-managed Canvas updates (no direct human editing allowed) → **Phase 4**
-- [ ] **CANVAS-06**: Sync Canvas content with .planning/ git files bidirectionally → **Phase 4**
-- [ ] **CANVAS-07**: Create community roadmap Canvas showing public development progress → **Phase 4**
-- [ ] **CANVAS-08**: Show implementation dashboard with queue, active work, and completed items → **Phase 4**
+| Category | Count | Priority |
+|----------|-------|----------|
+| Migration Logic Fix | 3 | P0 - Critical |
+| Slack Channel Automation | 4 | P1 - High |
+| Approval Workflow | 4 | P1 - High |
+| **Total** | **11** | — |
 
-### Workflow System
-- [ ] **WORKFLOW-01**: Implement two-track development (collaborative planning track + trunk-based implementation track) → **Phase 5**
-- [ ] **WORKFLOW-02**: Create focus group approval process for concept maturation → **Phase 5**
-- [ ] **WORKFLOW-03**: Implement concept → implementation promotion with owner assignment → **Phase 5**
-- [ ] **WORKFLOW-04**: Create implementation prioritization system visible in master dashboard → **Phase 5**
-- [ ] **WORKFLOW-05**: Enforce ~1 implementation per focus group natural scaling → **Phase 5**
-- [ ] **WORKFLOW-06**: Implement concept development workflow (planning PRs to focus groups) → **Phase 5**
-- [ ] **WORKFLOW-07**: Implement implementation workflow (code PRs directly to develop) → **Phase 5**
-- [ ] **WORKFLOW-08**: Create implementation status tracking and progress visualization → **Phase 5**
+---
 
-### Community Integration
-- [ ] **COMMUNITY-01**: Create public community feedback collection system → **Phase 6**
-- [ ] **COMMUNITY-02**: Implement moderation triage workflow (move community ideas to focus groups) → **Phase 6**
-- [ ] **COMMUNITY-03**: Auto-invite original community contributors to relevant private channels → **Phase 6**
-- [ ] **COMMUNITY-04**: Create community access request system for interested users → **Phase 6**
-- [ ] **COMMUNITY-05**: Show community contributors in focus group Canvas with attribution → **Phase 6**
-- [ ] **COMMUNITY-06**: Create moderation commands (move-to-focus-group, invite-contributor, etc.) → **Phase 6**
-- [ ] **COMMUNITY-07**: Implement transparent development visibility for community members → **Phase 6**
+## Migration Logic Fix (P0 - Critical)
 
-### Integration & Architecture
-- [ ] **INTEGRATE-01**: Implement workspace management for wgsd/{project} structure → **Phase 1**
-- [ ] **INTEGRATE-02**: Create branch strategy enforcement (develop base, clean checkouts) → **Phase 1**
-- [ ] **INTEGRATE-03**: Implement .planning/ structure migration from GSD to WGSD format → **Phase 1**
-- [ ] **INTEGRATE-04**: Create Slack API integration for private/public channel management → **Phase 3**
-- [ ] **INTEGRATE-05**: Implement conversations.canvases.create API integration for Canvas management → **Phase 4**
-- [ ] **INTEGRATE-06**: Create git operations integration for workspace and branch management → **Phase 1**
-- [ ] **INTEGRATE-07**: Implement GitHub PR workflow integration for focus group → develop flow → **Phase 5**
-- [ ] **INTEGRATE-08**: Create proper error handling and rollback for failed migrations → **Phase 2**
+The current migration incorrectly maps GSD Phases to WGSD Focus Groups. Phases are specific work items with defined scope and tasks — they should map to Concepts, not Focus Groups.
+
+**Correct Mapping:**
+- GSD Phase → WGSD Concept (specific deliverable)
+- Focus Groups are thematic containers defined by user (e.g., "Core", "Migration", "Channels")
+- Requirements stay as requirements
+
+### MIG-FIX-01: Update migrate.md Workflow
+
+**As a** user migrating from GSD  
+**I want** Phases to become Concepts  
+**So that** the semantic meaning is preserved correctly
+
+**Acceptance Criteria:**
+- [ ] migrate.md maps Phase N → Concept (not Focus Group)
+- [ ] Focus Group suggestions are thematic groupings, not 1:1 from phases
+- [ ] Existing migration steps updated with correct terminology
+
+**Files:** `workflows/migrate.md`
+
+---
+
+### MIG-FIX-02: Update migration-analyzer.md Agent
+
+**As a** user running migration analysis  
+**I want** the analyzer to suggest Concepts from Phases  
+**So that** the migration preview shows correct mappings
+
+**Acceptance Criteria:**
+- [ ] Agent output includes `suggested_concepts[]` (not focus groups)
+- [ ] Agent suggests thematic Focus Groups separately
+- [ ] Agent explains Concept derivation from Phase content
+
+**Files:** `agents/migration-analyzer.md`
+
+---
+
+### MIG-FIX-03: Update planning-migrator.md Agent
+
+**As a** user completing migration  
+**I want** Phase content transformed to Concept format  
+**So that** migrated content matches WGSD structure
+
+**Acceptance Criteria:**
+- [ ] Agent transforms Phase description → Concept description
+- [ ] Agent maps Phase requirements → Concept acceptance criteria
+- [ ] Agent assigns Concepts to appropriate Focus Groups
+
+**Files:** `agents/planning-migrator.md`
+
+---
+
+## Slack Channel Automation (P1 - High)
+
+Currently migration completes but leaves user to manually create all Slack channels. The migration should auto-create the full channel structure.
+
+### SLACK-AUTO-01: Auto-Create Core Dev Channel
+
+**As a** user completing migration  
+**I want** {stub}-dev channel created automatically  
+**So that** I don't need manual setup
+
+**Acceptance Criteria:**
+- [ ] Private channel {stub}-dev created
+- [ ] Channel has master dashboard Canvas
+- [ ] User is added as channel member
+
+**Files:** `workflows/migrate.md`, `workflows/lib/slack-api.md`
+
+---
+
+### SLACK-AUTO-02: Auto-Create Focus Group Channels
+
+**As a** user completing migration  
+**I want** {stub}-fg-{focus} channels created for each Focus Group  
+**So that** the full channel structure is ready
+
+**Acceptance Criteria:**
+- [ ] Private channel created per Focus Group
+- [ ] Each channel has appropriate Canvas
+- [ ] User is added as member to all channels
+
+**Files:** `workflows/migrate.md`
+
+---
+
+### SLACK-AUTO-03: Auto-Create Community Channel
+
+**As a** user completing migration  
+**I want** {stub}-community channel created  
+**So that** community integration is ready
+
+**Acceptance Criteria:**
+- [ ] Public channel {stub}-community created
+- [ ] Channel has roadmap Canvas
+- [ ] Community channels follow security model
+
+**Files:** `workflows/migrate.md`
+
+---
+
+### SLACK-AUTO-04: Integrate Channel Creation into Migration Flow
+
+**As a** migration workflow  
+**I want** channel creation to happen at the right step  
+**So that** migration is a single cohesive operation
+
+**Acceptance Criteria:**
+- [ ] Channel creation happens after approval, before completion
+- [ ] Failures are handled gracefully with rollback
+- [ ] Success/failure reported in migration summary
+
+**Files:** `workflows/migrate.md`
+
+---
+
+## Approval Workflow (P1 - High)
+
+Currently migration executes immediately without user review. Users need to see what will happen and approve before execution.
+
+### APPROVE-01: Generate Migration Preview
+
+**As a** user starting migration  
+**I want** a complete preview of proposed changes  
+**So that** I understand what will happen
+
+**Acceptance Criteria:**
+- [ ] Preview shows: Focus Groups to create
+- [ ] Preview shows: Concepts to create (with source Phase)
+- [ ] Preview shows: Channels to create
+- [ ] Preview shows: Files to transform
+
+**Files:** `workflows/migrate.md`
+
+---
+
+### APPROVE-02: Display Preview to User
+
+**As a** user viewing migration preview  
+**I want** clear, formatted preview output  
+**So that** I can easily understand the plan
+
+**Acceptance Criteria:**
+- [ ] Preview uses clear section headers
+- [ ] Preview shows mapping (Phase X → Concept Y)
+- [ ] Preview shows channel names that will be created
+- [ ] Preview is conversational, not just data dump
+
+**Files:** `workflows/migrate.md`
+
+---
+
+### APPROVE-03: Require Explicit Approval
+
+**As a** user reviewing migration  
+**I want** to explicitly approve before execution  
+**So that** I have control over the process
+
+**Acceptance Criteria:**
+- [ ] Migration pauses after preview display
+- [ ] User must confirm to proceed
+- [ ] "No" response aborts migration cleanly
+- [ ] Approval is logged in migration output
+
+**Files:** `workflows/migrate.md`
+
+---
+
+### APPROVE-04: Allow Modification Before Approval
+
+**As a** user reviewing migration preview  
+**I want** to modify suggestions before approval  
+**So that** I can customize the migration
+
+**Acceptance Criteria:**
+- [ ] User can rename Focus Groups
+- [ ] User can reassign Concepts to different Focus Groups
+- [ ] User can exclude certain Phases from migration
+- [ ] Changes are reflected in updated preview
+
+**Files:** `workflows/migrate.md`
 
 ---
 
 ## Traceability Matrix
 
-| Phase | Requirements | Count |
-|-------|--------------|-------|
-| **Phase 1: Foundation** | INTEGRATE-01, INTEGRATE-02, INTEGRATE-03, INTEGRATE-06, CHANNEL-01, CHANNEL-02 | 6 |
-| **Phase 2: Migration** | MIGRATE-01, MIGRATE-02, MIGRATE-03, MIGRATE-04, MIGRATE-05, MIGRATE-06, MIGRATE-07, MIGRATE-08, INTEGRATE-08 | 9 |
-| **Phase 3: Channels** | CHANNEL-03, CHANNEL-04, CHANNEL-05, CHANNEL-06, CHANNEL-07, CHANNEL-08, INTEGRATE-04 | 7 |
-| **Phase 4: Canvas** | CANVAS-01, CANVAS-02, CANVAS-03, CANVAS-04, CANVAS-05, CANVAS-06, CANVAS-07, CANVAS-08, INTEGRATE-05 | 9 |
-| **Phase 5: Workflow** | WORKFLOW-01, WORKFLOW-02, WORKFLOW-03, WORKFLOW-04, WORKFLOW-05, WORKFLOW-06, WORKFLOW-07, WORKFLOW-08, INTEGRATE-07 | 9 |
-| **Phase 6: Community** | COMMUNITY-01, COMMUNITY-02, COMMUNITY-03, COMMUNITY-04, COMMUNITY-05, COMMUNITY-06, COMMUNITY-07 | 7 |
-| **Total** | | **47** |
+| Requirement | Phase | Files Affected |
+|-------------|-------|----------------|
+| MIG-FIX-01 | 7 | workflows/migrate.md |
+| MIG-FIX-02 | 7 | agents/migration-analyzer.md |
+| MIG-FIX-03 | 7 | agents/planning-migrator.md |
+| SLACK-AUTO-01 | 8 | workflows/migrate.md |
+| SLACK-AUTO-02 | 8 | workflows/migrate.md |
+| SLACK-AUTO-03 | 8 | workflows/migrate.md |
+| SLACK-AUTO-04 | 8 | workflows/migrate.md |
+| APPROVE-01 | 9 | workflows/migrate.md |
+| APPROVE-02 | 9 | workflows/migrate.md |
+| APPROVE-03 | 9 | workflows/migrate.md |
+| APPROVE-04 | 9 | workflows/migrate.md |
 
 ---
 
-## v2 Requirements (Future)
+## Dependencies
 
-### Advanced Features
-- [ ] **ADVANCED-01**: Multi-repository WGSD project support
-- [ ] **ADVANCED-02**: Automated dependency detection between focus groups
-- [ ] **ADVANCED-03**: Implementation resource allocation and scheduling
-- [ ] **ADVANCED-04**: Advanced analytics and development velocity tracking
-- [ ] **ADVANCED-05**: Integration with other collaboration platforms beyond Slack
+```
+Phase 7 (Logic Fix) ─────────┐
+                             ├──► Phase 9 (Approval)
+Phase 8 (Slack Automation) ──┘
+```
 
-### Scale & Performance  
-- [ ] **SCALE-01**: Support for large teams (20+ developers across multiple focus groups)
-- [ ] **SCALE-02**: Advanced conflict detection and resolution between implementations
-- [ ] **SCALE-03**: Automated load balancing of implementation assignments
-- [ ] **SCALE-04**: Performance optimization for Canvas updates at scale
+**Phase 7** and **Phase 8** can run in parallel.  
+**Phase 9** depends on both (approval shows correct mappings + channel names).
 
 ---
 
-## Out of Scope
+## Definition of Done
 
-- **Direct Canvas editing by humans** — All Canvas updates must go through AI conversation to maintain consistency
-- **Public development channels** — Security requirement keeps all development discussions private
-- **Automated implementation assignment** — Implementation ownership requires human decision and commitment
-- **Non-Slack platforms** — Focus on Slack-native experience for initial version
-- **Backwards compatibility with old WGSD format** — Clean break with v2.0 enhanced structure
-- **Real-time collaboration editing** — Canvas updates are AI-managed, not real-time collaborative
-- **Multi-tenant WGSD hosting** — Each organization runs their own WGSD instance
+- [ ] All 11 requirements implemented
+- [ ] migrate.md correctly maps Phase → Concept
+- [ ] All Slack channels auto-created
+- [ ] User sees preview and approves before execution
+- [ ] End-to-end migration tested successfully
 
 ---
 
-## Coverage Verification
-
-**All 47 v1 requirements mapped to exactly one phase:**
-
-### By Category
-| Category | Req Count | Phases Used |
-|----------|-----------|-------------|
-| Migration System | 8 | Phase 2 |
-| Channel Infrastructure | 8 | Phase 1, Phase 3 |
-| Canvas Management | 8 | Phase 4 |
-| Workflow System | 8 | Phase 5 |
-| Community Integration | 7 | Phase 6 |
-| Integration & Architecture | 8 | Phase 1, Phase 2, Phase 3, Phase 4, Phase 5 |
-
-### Integration Requirements Distribution
-| INTEGRATE-* | Phase | Rationale |
-|-------------|-------|-----------|
-| INTEGRATE-01 | 1 | Workspace is foundational |
-| INTEGRATE-02 | 1 | Branch strategy is foundational |
-| INTEGRATE-03 | 1 | Planning structure needed before migration |
-| INTEGRATE-04 | 3 | Slack API for channel automation |
-| INTEGRATE-05 | 4 | Canvas API for canvas management |
-| INTEGRATE-06 | 1 | Git ops are foundational |
-| INTEGRATE-07 | 5 | PR workflow is part of workflow engine |
-| INTEGRATE-08 | 2 | Rollback needed for migration safety |
-
----
-
-*Requirements defined: 2026-02-22 during comprehensive GSD planning session*
-*Traceability added: 2026-02-22 by roadmapper*
+*Requirements document for WGSD v2.1 — Migration Experience Improvements*
