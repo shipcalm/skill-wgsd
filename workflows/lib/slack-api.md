@@ -696,4 +696,386 @@ slack_create_canvas "C0123456789" "Security Roadmap" "# Security Focus Group\n\n
 
 ---
 
-*Library created for WGSD Phase 3*
+## Thread Operations (Phase 14)
+
+### slack_post_thread_reply
+
+Post a reply to an existing message thread.
+
+```bash
+# Usage: slack_post_thread_reply <channel_id> <thread_ts> <text> [blocks_json]
+# Returns: Message ts or error
+slack_post_thread_reply() {
+  local channel_id="$1"
+  local thread_ts="$2"
+  local text="$3"
+  local blocks="${4:-}"
+  
+  if [ -z "$channel_id" ] || [ -z "$thread_ts" ] || [ -z "$text" ]; then
+    echo "ERROR: Channel ID, thread_ts, and text are required"
+    return 1
+  fi
+  
+  local token=$(slack_get_token)
+  if [ $? -ne 0 ]; then
+    echo "$token"
+    return 1
+  fi
+  
+  local data
+  if [ -n "$blocks" ]; then
+    data=$(jq -n \
+      --arg channel "$channel_id" \
+      --arg text "$text" \
+      --arg thread_ts "$thread_ts" \
+      --argjson blocks "$blocks" \
+      '{channel: $channel, text: $text, thread_ts: $thread_ts, blocks: $blocks}')
+  else
+    data=$(jq -n \
+      --arg channel "$channel_id" \
+      --arg text "$text" \
+      --arg thread_ts "$thread_ts" \
+      '{channel: $channel, text: $text, thread_ts: $thread_ts}')
+  fi
+  
+  local response=$(slack_api_call POST "chat.postMessage" "$data")
+  
+  if [ $? -ne 0 ]; then
+    return 1
+  fi
+  
+  local ts=$(echo "$response" | jq -r '.ts')
+  echo "REPLY_TS:$ts"
+  return 0
+}
+```
+
+---
+
+### slack_get_thread_replies
+
+Get all replies in a thread.
+
+```bash
+# Usage: slack_get_thread_replies <channel_id> <thread_ts> [limit]
+# Returns: JSON array of messages
+slack_get_thread_replies() {
+  local channel_id="$1"
+  local thread_ts="$2"
+  local limit="${3:-100}"
+  
+  if [ -z "$channel_id" ] || [ -z "$thread_ts" ]; then
+    echo "ERROR: Channel ID and thread_ts are required"
+    return 1
+  fi
+  
+  local response=$(slack_api_call GET "conversations.replies?channel=$channel_id&ts=$thread_ts&limit=$limit")
+  
+  if [ $? -ne 0 ]; then
+    return 1
+  fi
+  
+  echo "$response" | jq '.messages'
+  return 0
+}
+```
+
+---
+
+### slack_update_message
+
+Update an existing message.
+
+```bash
+# Usage: slack_update_message <channel_id> <message_ts> <text> [blocks_json]
+# Returns: Success or error
+slack_update_message() {
+  local channel_id="$1"
+  local message_ts="$2"
+  local text="$3"
+  local blocks="${4:-}"
+  
+  if [ -z "$channel_id" ] || [ -z "$message_ts" ] || [ -z "$text" ]; then
+    echo "ERROR: Channel ID, message_ts, and text are required"
+    return 1
+  fi
+  
+  local token=$(slack_get_token)
+  if [ $? -ne 0 ]; then
+    echo "$token"
+    return 1
+  fi
+  
+  local data
+  if [ -n "$blocks" ]; then
+    data=$(jq -n \
+      --arg channel "$channel_id" \
+      --arg ts "$message_ts" \
+      --arg text "$text" \
+      --argjson blocks "$blocks" \
+      '{channel: $channel, ts: $ts, text: $text, blocks: $blocks}')
+  else
+    data=$(jq -n \
+      --arg channel "$channel_id" \
+      --arg ts "$message_ts" \
+      --arg text "$text" \
+      '{channel: $channel, ts: $ts, text: $text}')
+  fi
+  
+  local response=$(slack_api_call POST "chat.update" "$data")
+  
+  if [ $? -ne 0 ]; then
+    return 1
+  fi
+  
+  echo "✅ Message updated"
+  return 0
+}
+```
+
+---
+
+### slack_add_reaction
+
+Add an emoji reaction to a message.
+
+```bash
+# Usage: slack_add_reaction <channel_id> <message_ts> <emoji_name>
+# emoji_name without colons (e.g., "white_check_mark" not ":white_check_mark:")
+slack_add_reaction() {
+  local channel_id="$1"
+  local message_ts="$2"
+  local emoji="$3"
+  
+  if [ -z "$channel_id" ] || [ -z "$message_ts" ] || [ -z "$emoji" ]; then
+    echo "ERROR: Channel ID, message_ts, and emoji are required"
+    return 1
+  fi
+  
+  # Remove colons if present
+  emoji=$(echo "$emoji" | tr -d ':')
+  
+  local data=$(jq -n \
+    --arg channel "$channel_id" \
+    --arg timestamp "$message_ts" \
+    --arg name "$emoji" \
+    '{channel: $channel, timestamp: $timestamp, name: $name}')
+  
+  local response=$(slack_api_call POST "reactions.add" "$data")
+  
+  if [ $? -ne 0 ]; then
+    if echo "$response" | grep -q "already_reacted"; then
+      echo "ℹ️  Reaction already exists"
+      return 0
+    fi
+    return 1
+  fi
+  
+  echo "✅ Reaction added"
+  return 0
+}
+```
+
+---
+
+### slack_get_reactions
+
+Get reactions on a message.
+
+```bash
+# Usage: slack_get_reactions <channel_id> <message_ts>
+# Returns: JSON array of reactions
+slack_get_reactions() {
+  local channel_id="$1"
+  local message_ts="$2"
+  
+  if [ -z "$channel_id" ] || [ -z "$message_ts" ]; then
+    echo "ERROR: Channel ID and message_ts are required"
+    return 1
+  fi
+  
+  local response=$(slack_api_call GET "reactions.get?channel=$channel_id&timestamp=$message_ts")
+  
+  if [ $? -ne 0 ]; then
+    return 1
+  fi
+  
+  echo "$response" | jq '.message.reactions // []'
+  return 0
+}
+```
+
+---
+
+### slack_get_permalink
+
+Get a permanent link to a message.
+
+```bash
+# Usage: slack_get_permalink <channel_id> <message_ts>
+# Returns: Permalink URL
+slack_get_permalink() {
+  local channel_id="$1"
+  local message_ts="$2"
+  
+  if [ -z "$channel_id" ] || [ -z "$message_ts" ]; then
+    echo "ERROR: Channel ID and message_ts are required"
+    return 1
+  fi
+  
+  local response=$(slack_api_call GET "chat.getPermalink?channel=$channel_id&message_ts=$message_ts")
+  
+  if [ $? -ne 0 ]; then
+    return 1
+  fi
+  
+  echo "$response" | jq -r '.permalink'
+  return 0
+}
+```
+
+---
+
+### slack_post_ephemeral
+
+Post an ephemeral (only visible to one user) message.
+
+```bash
+# Usage: slack_post_ephemeral <channel_id> <user_id> <text> [blocks_json]
+# Returns: Success or error
+slack_post_ephemeral() {
+  local channel_id="$1"
+  local user_id="$2"
+  local text="$3"
+  local blocks="${4:-}"
+  
+  if [ -z "$channel_id" ] || [ -z "$user_id" ] || [ -z "$text" ]; then
+    echo "ERROR: Channel ID, user_id, and text are required"
+    return 1
+  fi
+  
+  local data
+  if [ -n "$blocks" ]; then
+    data=$(jq -n \
+      --arg channel "$channel_id" \
+      --arg user "$user_id" \
+      --arg text "$text" \
+      --argjson blocks "$blocks" \
+      '{channel: $channel, user: $user, text: $text, blocks: $blocks}')
+  else
+    data=$(jq -n \
+      --arg channel "$channel_id" \
+      --arg user "$user_id" \
+      --arg text "$text" \
+      '{channel: $channel, user: $user, text: $text}')
+  fi
+  
+  local response=$(slack_api_call POST "chat.postEphemeral" "$data")
+  
+  if [ $? -ne 0 ]; then
+    return 1
+  fi
+  
+  echo "✅ Ephemeral message sent"
+  return 0
+}
+```
+
+---
+
+### slack_send_dm
+
+Send a direct message to a user.
+
+```bash
+# Usage: slack_send_dm <user_id> <text> [blocks_json]
+# Returns: Message ts or error
+slack_send_dm() {
+  local user_id="$1"
+  local text="$2"
+  local blocks="${3:-}"
+  
+  if [ -z "$user_id" ] || [ -z "$text" ]; then
+    echo "ERROR: User ID and text are required"
+    return 1
+  fi
+  
+  local token=$(slack_get_token)
+  if [ $? -ne 0 ]; then
+    echo "$token"
+    return 1
+  fi
+  
+  # Open DM channel first
+  local dm_response=$(curl -s -X POST "https://slack.com/api/conversations.open" \
+    -H "Authorization: Bearer $token" \
+    -H "Content-Type: application/json" \
+    -d "$(jq -n --arg users "$user_id" '{users: $users}')")
+  
+  local dm_channel=$(echo "$dm_response" | jq -r '.channel.id // empty')
+  
+  if [ -z "$dm_channel" ]; then
+    echo "ERROR: Could not open DM channel"
+    return 1
+  fi
+  
+  # Post message to DM channel
+  local data
+  if [ -n "$blocks" ]; then
+    data=$(jq -n \
+      --arg channel "$dm_channel" \
+      --arg text "$text" \
+      --argjson blocks "$blocks" \
+      '{channel: $channel, text: $text, blocks: $blocks}')
+  else
+    data=$(jq -n \
+      --arg channel "$dm_channel" \
+      --arg text "$text" \
+      '{channel: $channel, text: $text}')
+  fi
+  
+  local response=$(slack_api_call POST "chat.postMessage" "$data")
+  
+  if [ $? -ne 0 ]; then
+    return 1
+  fi
+  
+  local ts=$(echo "$response" | jq -r '.ts')
+  echo "DM_SENT:$ts"
+  return 0
+}
+```
+
+---
+
+## Thread Usage Examples
+
+```bash
+# Post a reply to a thread
+slack_post_thread_reply "C0123456789" "1234567890.123456" "Great point! I agree."
+
+# Get all replies in a thread
+replies=$(slack_get_thread_replies "C0123456789" "1234567890.123456")
+
+# Update a message
+slack_update_message "C0123456789" "1234567890.123456" "Updated text here"
+
+# Add a reaction
+slack_add_reaction "C0123456789" "1234567890.123456" "white_check_mark"
+
+# Get reactions on a message
+reactions=$(slack_get_reactions "C0123456789" "1234567890.123456")
+
+# Send ephemeral message (only visible to one user)
+slack_post_ephemeral "C0123456789" "U0123456789" "Only you can see this!"
+
+# Send a DM
+slack_send_dm "U0123456789" "Hello! This is a direct message."
+
+# Get permalink to share
+link=$(slack_get_permalink "C0123456789" "1234567890.123456")
+```
+
+---
+
+*Library created for WGSD Phase 3, enhanced for Phase 14 (Thread Operations)*

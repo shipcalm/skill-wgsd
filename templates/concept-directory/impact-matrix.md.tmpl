@@ -1,175 +1,141 @@
+---
+name: impact-matrix-template
+description: Impact matrix template for v2.2 concept directories with Phase 14 approval tracking
+---
+
 # Impact Matrix: {{CONCEPT_NAME}}
+
+Cross-cutting impact declarations for stakeholder notification and approval tracking.
 
 ```yaml
 ---
 concept: {{CONCEPT_SLUG}}
+focus_group: {{FOCUS_GROUP}}
 created: {{DATE}}
 updated: {{DATE}}
-primary_focus_group: {{PRIMARY_FOCUS_GROUP}}
 status: draft
-version: 1
 
-# Approval Matrix Configuration
-approval_matrix:
-  required_approvals: all          # "all" | number (e.g., 2)
-  allow_partial_implementation: false
-  sla_config:
-    P0: 4                          # hours
-    P1: 24
-    P2: 72
-    P3: 168                        # 7 days
+# Slack message tracking (Phase 14)
+approval_prompts: []
+  # - channel_id: C0123456789
+  #   message_ts: "1234567890.123456"
+  #   focus_group: security
+  #   posted_at: 2026-02-23T10:00:00Z
 
-# Structured impact declarations with approval tracking (machine-parseable)
+# Discussion thread tracking (Phase 14)
+discussion_threads: []
+  # - channel_id: C0123456789
+  #   thread_ts: "1234567890.123456"
+  #   focus_group: security
+  #   started_at: 2026-02-23T10:05:00Z
+  #   author_notified: true
+
+# Rejection history (Phase 14)
+rejection_history: []
+  # - focus_group: security
+  #   rejected_by: "@alice"
+  #   date: 2026-02-20
+  #   reason: "Token refresh needs rate limiting"
+  #   timestamp: 2026-02-20T15:30:00Z
+
+# Impact declarations
 impacts:
-  - focus_group: {{PRIMARY_FOCUS_GROUP}}
+  - focus_group: {{FOCUS_GROUP}}
     priority: {{PRIORITY}}
     type: primary-owner
-    description: "{{IMPACT_DESCRIPTION}}"
-    # Core approval tracking
-    status: pending                 # pending | approved | rejected | blocked
+    description: "{{BRIEF_DESCRIPTION}}"
+    status: pending
     approver: null
     approved_date: null
     approval_comment: null
-    # Notification tracking
     notified: false
     notified_date: null
-    # Matrix-specific: Blocking dependencies
-    blocked_by: null                # Focus group blocking this approval
+    sla_deadline: null
+    blocked_by: null
     blocked_reason: null
     blocked_date: null
-    # Matrix-specific: SLA tracking
-    sla_deadline: null              # Auto-calculated from priority + creation
-    sla_warning_sent: false
-    # Matrix-specific: Admin override
     overridden: false
     override_by: null
-    override_date: null
     override_reason: null
-    original_status: null           # Preserved for audit
-
-# Example additional impact with full matrix fields:
-# - focus_group: security
-#   priority: P1
-#   type: integration
-#   description: "Token validation changes affect auth flow"
-#   status: pending
-#   approver: null
-#   approved_date: null
-#   approval_comment: null
-#   notified: false
-#   notified_date: null
-#   blocked_by: null
-#   blocked_reason: null
-#   blocked_date: null
-#   sla_deadline: null
-#   sla_warning_sent: false
-#   overridden: false
-#   override_by: null
-#   override_date: null
-#   override_reason: null
-#   original_status: null
-
-# Schema Reference:
-# priority: P0 (Critical) | P1 (High) | P2 (Medium) | P3 (Low)
-# type: primary-owner | breaking-change | api-change | documentation | integration | testing | behavior | security | performance
-# status: pending | approved | rejected | blocked
 ---
 ```
 
-## Overview
+## Impact Summary
 
-This file declares which focus groups are impacted by this concept and tracks approval status. Each impact becomes an approval requirement before implementation.
+| Focus Group | Priority | Type | Status | Approver |
+|-------------|----------|------|--------|----------|
+| {{FOCUS_GROUP}} | {{PRIORITY}} | primary-owner | ⏳ pending | - |
 
-**Matrix-Based Approval:** Each impacted focus group independently reviews and approves. A concept is fully approved only when ALL required focus groups have approved.
+## Description
 
----
+{{BRIEF_DESCRIPTION}}
 
-## Impact Declarations
+## Impact Details
 
-### Focus Group: {{PRIMARY_FOCUS_GROUP}} (Primary Owner)
+### {{FOCUS_GROUP}} (Primary Owner)
 
-| Field | Value |
-|-------|-------|
-| **Priority** | {{PRIORITY}} |
-| **Impact Type** | Primary Owner |
-| **Description** | {{IMPACT_DESCRIPTION}} |
-| **Approval Status** | ⏳ Pending |
-| **SLA Deadline** | — |
-| **Approver** | — |
-| **Approved Date** | — |
+**Priority:** {{PRIORITY}}  
+**Type:** Primary Owner  
+**Impact:** This focus group owns the concept and leads its development.
+
+**Review Checklist:**
+- [ ] Concept aligns with focus group charter
+- [ ] Technical approach is sound
+- [ ] Dependencies are identified
+- [ ] Risks are documented
 
 ---
 
 ## Adding Cross-Cutting Impacts
 
-To declare impact on additional focus groups:
+When this concept affects other focus groups, add impacts using:
 
-1. **Interactive Method:** Run `/wgsd declare-impact {{CONCEPT_SLUG}}`
-2. **Manual Method:** Add entries to the `impacts:` array in YAML frontmatter
+```bash
+/wgsd declare-impact {{CONCEPT_SLUG}} --fg <focus_group> --priority P1 --type integration --desc "Description of impact"
+```
 
-### Impact Type Reference
+**Impact Types:**
+- `primary-owner` - Focus group owns this concept
+- `breaking-change` - API/behavior breaking changes
+- `api-change` - Non-breaking API modifications
+- `documentation` - Documentation updates required
+- `integration` - Integration touchpoints affected
+- `testing` - Test suite changes needed
+- `behavior` - Behavior changes (non-breaking)
+- `security` - Security implications
+- `performance` - Performance considerations
 
-| Type | Description | Example |
-|------|-------------|---------|
-| `primary-owner` | This FG owns the concept | The originating focus group |
-| `breaking-change` | API/behavior breaking changes | Endpoint signature changes |
-| `api-change` | Non-breaking API modifications | New optional parameters |
-| `documentation` | Docs must be updated | API reference changes |
-| `integration` | Integration touchpoints affected | Auth flow changes |
-| `testing` | Test suite modifications needed | New test scenarios |
-| `behavior` | Behavior changes (non-breaking) | Default value changes |
-| `security` | Security implications | Token handling, permissions |
-| `performance` | Performance considerations | Query optimization needs |
-
-### Priority Reference
-
-| Priority | SLA | Description |
-|----------|-----|-------------|
-| P0 | 4h | Critical - blocks other work |
-| P1 | 24h | High - affects current sprint |
-| P2 | 72h | Medium - planned work impact |
-| P3 | 7d | Low - nice to know |
+**Priority Levels:**
+- `P0` - Critical (4h SLA)
+- `P1` - High (24h SLA)
+- `P2` - Medium (72h SLA)
+- `P3` - Low (7d SLA)
 
 ---
 
-## Approval Matrix Status
+## Approval Workflow
 
-| Focus Group | Priority | Type | Status | Blocked By | SLA | Approver |
-|-------------|----------|------|--------|------------|-----|----------|
-| {{PRIMARY_FOCUS_GROUP}} | {{PRIORITY}} | primary-owner | ⏳ Pending | — | — | — |
+When impacts are declared:
+1. Focus group channels receive rich approval prompts
+2. Members can approve via `/wgsd approve {{CONCEPT_SLUG}}` or ✅ reaction
+3. Discussion threads enable feedback before approval
+4. Rejections require feedback and trigger re-review workflow
+5. Full approval triggers auto-merge to roadmap branch
 
-### Status Legend
-- ⏳ Pending - Awaiting review
-- ✅ Approved - Focus group approved
-- 🚫 Rejected - Focus group rejected (see feedback)
-- ⏸️ Blocked - Waiting on dependency
-
-### SLA Legend
-- ✓ On track
-- ⚠️ Approaching deadline
-- ⛔ Overdue
-
----
-
-## Approval Requirements
-
-**Required for Implementation:**
-- [ ] All impacted focus groups must approve (status = approved)
-- [ ] No "Rejected" statuses (unless overridden)
-- [ ] No "Blocked" statuses remaining
-- [ ] Primary focus group approved
-
-**Override Authority:**
-Admins can force-approve blocked or pending approvals using `/wgsd override`. This creates an audit trail and notifies the original focus group.
+**Quick Actions:**
+- Approve: `/wgsd approve {{CONCEPT_SLUG}}`
+- Reject: `/wgsd reject {{CONCEPT_SLUG}} "reason"`
+- Block: `/wgsd block {{CONCEPT_SLUG}} --until <fg>`
+- Status: `/wgsd status {{CONCEPT_SLUG}}`
 
 ---
 
 ## Change Log
 
-| Date | Change | Author |
-|------|--------|--------|
-| {{DATE}} | Impact matrix created | {{CREATOR}} |
+| Date | Change | By |
+|------|--------|-----|
+| {{DATE}} | Created | {{CREATOR}} |
 
 ---
 
-*This file is auto-generated and managed by WGSD. Use `/wgsd declare-impact` to modify impacts, `/wgsd approve` to approve, or `/wgsd block` to declare dependencies.*
+*Generated by WGSD v2.2 with Phase 14 Slack-Native Approval*

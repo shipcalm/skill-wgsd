@@ -36,6 +36,15 @@ What would you like to do?
 - **list-concepts [focus-group]** - Show concepts for focus group
 - **declare-impact [concept]** - Declare cross-cutting focus group impacts
 - **update-impact [concept]** - Modify existing impact declarations
+- **status [concept]** - Show approval status and progress (Phase 14)
+
+**Approval Commands (Phase 14 - Slack-Native):**
+- **approve [concept]** - Approve concept for your focus group (or use ✅ reaction)
+- **approve [concept] --fg [fg]** - Approve for specific focus group
+- **reject [concept] "reason"** - Reject with required feedback
+- **request-review [concept] --fg [fg]** - Request re-review after addressing feedback
+- **status [concept]** - Show detailed approval matrix
+- **status** - Show pending approvals in current channel
 
 **Implementation Commands:**
 - **create-implementation [concept]** - Start implementation from mature concept
@@ -144,6 +153,10 @@ Based on user input, route to appropriate workflow:
 | "update impact", "update-impact", "modify impact" | workflows/update-impact.md |
 | "merge to roadmap", "merge-to-roadmap", "roadmap merge" | workflows/merge-to-roadmap.md |
 | "roadmap sync", "roadmap-sync", "sync roadmap" | workflows/roadmap-sync.md |
+| "approve", "lgtm", "+1", "ship it" | workflows/conversational-approve.md |
+| "reject", "block" | workflows/conversational-reject.md |
+| "status", "approval-status", "show-approvals", "matrix" | workflows/concept-status.md |
+| "request-review", "re-review" | workflows/conversational-reject.md |
 
 </routing>
 
@@ -239,6 +252,14 @@ develop/main            ← Production code
 - **Merge In:** Concepts auto-merge when matrix approval completes
 - **Branch From:** Implementation branches start from roadmap
 - **Sync:** Periodically synced to develop via `wgsd roadmap-sync`
+
+**Slack-Native Approval (Phase 14):**
+- **Rich Prompts:** Approval requests appear with context, progress bars, and quick actions
+- **Conversational Approve:** `/wgsd approve`, ✅ reaction, or "LGTM" in thread
+- **Discussion Threads:** Auto-created for each approval request
+- **Status Summaries:** `/wgsd status` shows approval matrix with visual progress
+- **Rejection Workflow:** Required feedback, author notification, re-review path
+- **Full Approval:** Auto-triggers roadmap merge when all FGs approve
 
 **Worktrees:**
 ```
@@ -345,4 +366,8 @@ Located in `workflows/`:
 - Canvas sync enables live roadmap collaboration in Slack
 - Master roadmap aggregates status across all focus groups
 - Clear developer onboarding and workflow documentation
+- Slack-native approvals via conversation (Phase 14)
+- Rich approval prompts with visual progress indicators
+- Discussion threads capture approval context
+- Rejection feedback required with re-review workflow
 </success_criteria>

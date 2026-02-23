@@ -1,6 +1,10 @@
 ---
 name: wgsd:lib:impact-notifications
-description: Slack notification system for cross-cutting impact declarations
+description: Slack notification system for cross-cutting impact declarations with Phase 14 rich approval prompts
+dependencies:
+  - workflows/lib/approval-templates.md
+  - workflows/lib/slack-api.md
+  - workflows/conversational-approve.md
 ---
 
 # Impact Notifications Library
@@ -12,10 +16,12 @@ Send and track notifications to focus groups when concepts declare impacts on th
 ## Overview
 
 When a concept declares impact on a focus group:
-1. Focus group channel receives a notification
-2. Notification includes priority, type, and description
-3. Action prompts guide the review/approval process
-4. Re-notification occurs when impacts change
+1. Focus group channel receives a **rich approval prompt** (Phase 14)
+2. Notification includes priority, type, description, and approval matrix state
+3. **Quick actions** enable approve/reject/block directly from message
+4. **Discussion threads** capture concerns before approval
+5. Re-notification occurs when impacts change
+6. **Message tracking** enables reaction-based approvals
 
 ---
 
@@ -33,11 +39,11 @@ When a concept declares impact on a focus group:
 
 ## impact_notify_new
 
-Send notification for a new impact declaration.
+Send rich approval prompt for a new impact declaration (Phase 14 enhanced).
 
 ```bash
 # Usage: impact_notify_new <workspace> <concept_slug> <impact_json>
-# Returns: Success/error with message ID
+# Returns: Success/error with message ID, tracks message for reaction-based approval
 impact_notify_new() {
   local workspace="$1"
   local concept_slug="$2"
@@ -80,46 +86,8 @@ impact_notify_new() {
     return 0
   fi
   
-  # Build notification message
-  local priority_badge=""
-  case "$priority" in
-    P0) priority_badge="🔴 P0 - Critical" ;;
-    P1) priority_badge="🟠 P1 - High" ;;
-    P2) priority_badge="🟡 P2 - Medium" ;;
-    P3) priority_badge="🟢 P3 - Low" ;;
-  esac
-  
-  local type_label=""
-  case "$type" in
-    primary-owner) type_label="Primary Owner" ;;
-    breaking-change) type_label="Breaking Change" ;;
-    api-change) type_label="API Change" ;;
-    documentation) type_label="Documentation" ;;
-    integration) type_label="Integration" ;;
-    testing) type_label="Testing" ;;
-    behavior) type_label="Behavior" ;;
-    security) type_label="Security" ;;
-    performance) type_label="Performance" ;;
-    *) type_label="$type" ;;
-  esac
-  
-  local message="🔔 *New Impact Declaration: ${concept_slug}*
-
-A concept has declared impact on *#${channel_name}*:
-
-*Priority:* ${priority_badge}
-*Type:* ${type_label}
-*Impact:* ${description}
-
-📋 *Next Steps:*
-• Review concept: \`/wgsd concept ${concept_slug}\`
-• Approve: \`/wgsd approve ${concept_slug}\`
-• Discuss: Reply in thread
-
-_Concept: ${concept_slug} | Focus Group: ${focus_group}_"
-
-  # Send via Slack API
-  echo "📤 Sending notification to #$channel_name..."
+  # Phase 14: Generate rich approval prompt using template
+  echo "📤 Sending rich approval prompt to #$channel_name..."
   
   local token=$(jq -r '.channels.slack.botToken // empty' "$HOME/.openclaw/openclaw.json")
   if [ -z "$token" ]; then
@@ -127,27 +95,96 @@ _Concept: ${concept_slug} | Focus Group: ${focus_group}_"
     return 1
   fi
   
+  # Generate rich Block Kit message using approval template
+  local prompt_json=$(template_approval_prompt "$workspace" "$concept_slug" "$focus_group" "$impact_json")
+  local text=$(echo "$prompt_json" | jq -r '.text')
+  local blocks=$(echo "$prompt_json" | jq -c '.blocks')
+  
+  # Send rich message
   local response=$(curl -s -X POST "https://slack.com/api/chat.postMessage" \
     -H "Authorization: Bearer $token" \
     -H "Content-Type: application/json" \
     -d "$(jq -n \
       --arg channel "$channel_id" \
-      --arg text "$message" \
-      '{channel: $channel, text: $text, mrkdwn: true}')")
+      --arg text "$text" \
+      --argjson blocks "$blocks" \
+      '{channel: $channel, text: $text, blocks: $blocks}')")
   
   local ok=$(echo "$response" | jq -r '.ok')
   
   if [ "$ok" = "true" ]; then
     local ts=$(echo "$response" | jq -r '.ts')
-    echo "✅ Notification sent to #$channel_name"
+    echo "✅ Rich approval prompt sent to #$channel_name"
     echo "MESSAGE_ID:$ts"
     echo "CHANNEL_ID:$channel_id"
+    
+    # Phase 14: Track message for reaction-based approval
+    track_approval_prompt "$channel_id" "$ts" "$concept_slug" "$focus_group" "$workspace"
+    
+    # Phase 14: Create discussion thread starter
+    create_discussion_thread "$channel_id" "$ts" "$concept_slug" "$focus_group" ""
+    
+    # Phase 14: Update impact-matrix.md with prompt tracking
+    local concept_path=$(find_concept_path "$concept_slug" "$workspace")
+    if [ -n "$concept_path" ]; then
+      local impact_file="$concept_path/impact-matrix.md"
+      track_prompt_in_matrix "$impact_file" "$focus_group" "$channel_id" "$ts"
+    fi
+    
     return 0
   else
     local error=$(echo "$response" | jq -r '.error')
     echo "ERROR: Failed to send notification: $error"
     return 1
   fi
+}
+
+# Phase 14: Track prompt message in impact-matrix.md
+track_prompt_in_matrix() {
+  local impact_file="$1"
+  local focus_group="$2"
+  local channel_id="$3"
+  local message_ts="$4"
+  
+  if [ ! -f "$impact_file" ]; then
+    return 1
+  fi
+  
+  python3 -c "
+import re
+import yaml
+from datetime import datetime
+
+with open('$impact_file', 'r') as f:
+    content = f.read()
+
+yaml_match = re.search(r'\`\`\`yaml\n---\n(.*?)---\n\`\`\`', content, re.DOTALL)
+if not yaml_match:
+    exit(1)
+
+yaml_content = yaml_match.group(1)
+data = yaml.safe_load(yaml_content)
+
+# Initialize approval_prompts if not exists
+if 'approval_prompts' not in data:
+    data['approval_prompts'] = []
+
+# Add prompt tracking
+data['approval_prompts'].append({
+    'channel_id': '$channel_id',
+    'message_ts': '$message_ts',
+    'focus_group': '$focus_group',
+    'posted_at': datetime.utcnow().isoformat() + 'Z'
+})
+
+new_yaml = yaml.dump(data, default_flow_style=False, allow_unicode=True, sort_keys=False)
+new_content = content[:yaml_match.start()] + '\`\`\`yaml\n---\n' + new_yaml + '---\n\`\`\`' + content[yaml_match.end():]
+
+with open('$impact_file', 'w') as f:
+    f.write(new_content)
+" 2>/dev/null || true
+  
+  return 0
 }
 ```
 
