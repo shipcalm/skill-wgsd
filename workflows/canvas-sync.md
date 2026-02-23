@@ -322,7 +322,7 @@ sync_canvas_by_key() {
 
 ## Live Roadmap Visualization
 
-Build cross-focus-group roadmap view.
+Build cross-focus-group roadmap view. Supports v2.2 concept directories.
 
 ```bash
 build_live_roadmap() {
@@ -371,24 +371,65 @@ build_live_roadmap() {
       
       output+="### $display_name\n\n"
       
-      # List concepts with status
+      # List concepts with status (v2.2 directories and legacy files)
       local concepts_dir="$fg/concepts"
+      local has_concepts=false
+      
       if [ -d "$concepts_dir" ]; then
-        for concept_file in "$concepts_dir"/*.md; do
+        # v2.2 concept directories
+        for concept_dir in "$concepts_dir"/*/; do
+          [ -d "$concept_dir" ] || continue
+          local concept_name=$(basename "$concept_dir")
+          local concept_file="$concept_dir/CONCEPT.md"
+          
           [ -f "$concept_file" ] || continue
-          local concept_name=$(basename "$concept_file" .md)
-          local status=$(grep -m1 "^Status:" "$concept_file" 2>/dev/null | cut -d':' -f2 | xargs || echo "proposed")
+          has_concepts=true
+          
+          local status=$(grep -m1 "^\*\*Status:\*\*" "$concept_file" 2>/dev/null | sed 's/\*\*Status:\*\*//' | xargs || echo "draft")
+          local priority=$(grep -m1 "^\*\*Priority:\*\*" "$concept_file" 2>/dev/null | sed 's/\*\*Priority:\*\*//' | xargs || echo "")
+          
+          # Count artifacts
+          local artifact_count=$(ls -1 "$concept_dir" 2>/dev/null | wc -l)
           
           local emoji="📝"
           case "$status" in
             *ready*|*Ready*) emoji="✅" ;;
-            *active*|*Active*|*development*) emoji="🔄" ;;
-            *proposed*|*draft*) emoji="📝" ;;
+            *exploring*|*Exploring*) emoji="🔍" ;;
+            *mature*|*Mature*) emoji="🌟" ;;
+            *approved*|*Approved*) emoji="✨" ;;
+            *draft*|*Draft*) emoji="📝" ;;
           esac
           
-          output+="- $emoji $concept_name\n"
+          local info=""
+          [ -n "$priority" ] && info="$priority"
+          [ "$artifact_count" -gt 2 ] && info="${info:+$info, }📁$artifact_count"
+          
+          if [ -n "$info" ]; then
+            output+="- $emoji **$concept_name** ($info)\n"
+          else
+            output+="- $emoji **$concept_name**\n"
+          fi
         done
-      else
+        
+        # Legacy single-file concepts
+        for concept_file in "$concepts_dir"/*.md; do
+          [ -f "$concept_file" ] || continue
+          has_concepts=true
+          
+          local concept_name=$(basename "$concept_file" .md)
+          local status=$(grep -m1 "^\*\*Status:\*\*" "$concept_file" 2>/dev/null | sed 's/\*\*Status:\*\*//' | xargs || echo "draft")
+          
+          local emoji="📄"
+          case "$status" in
+            *ready*|*Ready*) emoji="✅" ;;
+            *active*|*Active*|*exploring*) emoji="🔄" ;;
+          esac
+          
+          output+="- $emoji $concept_name *(legacy)*\n"
+        done
+      fi
+      
+      if [ "$has_concepts" = false ]; then
         output+="*No concepts yet*\n"
       fi
       

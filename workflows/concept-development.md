@@ -73,82 +73,167 @@ echo "   Action: ${ACTION}"
 echo ""
 echo "🔍 Locating concept..."
 
-CONCEPT_FILE=""
+CONCEPT_PATH=""
+CONCEPT_TYPE=""  # "directory" or "file" (legacy)
 FOCUS_GROUP=""
 
 for fg_dir in .planning/focus-groups/*/; do
+    # Check for v2.2 directory format first
+    if [ -d "${fg_dir}concepts/${CONCEPT_NAME}" ]; then
+        CONCEPT_PATH="${fg_dir}concepts/${CONCEPT_NAME}"
+        CONCEPT_TYPE="directory"
+        FOCUS_GROUP=$(basename "$fg_dir")
+        break
+    fi
+    
+    # Fall back to legacy single-file format
     if [ -f "${fg_dir}concepts/${CONCEPT_NAME}.md" ]; then
-        CONCEPT_FILE="${fg_dir}concepts/${CONCEPT_NAME}.md"
+        CONCEPT_PATH="${fg_dir}concepts/${CONCEPT_NAME}.md"
+        CONCEPT_TYPE="file"
         FOCUS_GROUP=$(basename "$fg_dir")
         break
     fi
 done
 
-if [ -z "$CONCEPT_FILE" ]; then
+if [ -z "$CONCEPT_PATH" ]; then
     echo "❌ Concept not found: ${CONCEPT_NAME}"
     echo ""
     echo "💡 Available concepts:"
-    find .planning/focus-groups -name "*.md" -path "*/concepts/*" | \
-        sed 's|.planning/focus-groups/||;s|/concepts/| → |;s|\.md||'
+    # List directories (v2.2 format)
+    find .planning/focus-groups -mindepth 3 -maxdepth 3 -type d -path "*/concepts/*" 2>/dev/null | \
+        sed 's|.planning/focus-groups/||;s|/concepts/| → |' | while read line; do
+            echo "  📁 $line"
+        done
+    # List files (legacy format)
+    find .planning/focus-groups -name "*.md" -path "*/concepts/*" 2>/dev/null | \
+        sed 's|.planning/focus-groups/||;s|/concepts/| → |;s|\.md||' | while read line; do
+            echo "  📄 $line (legacy)"
+        done
     exit 1
 fi
 
-echo "📍 Found: ${FOCUS_GROUP} → ${CONCEPT_NAME}"
-echo "   File: ${CONCEPT_FILE}"
+# Set CONCEPT_FILE for compatibility
+if [ "$CONCEPT_TYPE" = "directory" ]; then
+    CONCEPT_FILE="${CONCEPT_PATH}/CONCEPT.md"
+    echo "📍 Found: ${FOCUS_GROUP} → ${CONCEPT_NAME} (directory)"
+    echo "   Path: ${CONCEPT_PATH}/"
+    echo "   Artifacts:"
+    ls -1 "${CONCEPT_PATH}/" 2>/dev/null | while read f; do
+        echo "     - $f"
+    done
+else
+    CONCEPT_FILE="${CONCEPT_PATH}"
+    echo "📍 Found: ${FOCUS_GROUP} → ${CONCEPT_NAME} (legacy file)"
+    echo "   File: ${CONCEPT_FILE}"
+    echo ""
+    echo "💡 Consider migrating to directory format:"
+    echo "   /wgsd migrate-concept ${CONCEPT_NAME}"
+fi
 ```
 
 ---
 
 ## Action: Edit Concept
 
-Create or switch to a planning branch for editing.
+Switch to concept branch for editing. v2.2 concepts have dedicated branches.
 
 ```bash
 if [ "$ACTION" = "edit" ]; then
     echo ""
     echo "✏️ Starting concept edit..."
     
-    # Determine branch names
+    # Determine branch names (v2.2 uses concepts/{name} directly)
     FG_BRANCH="focus-groups/${FOCUS_GROUP}"
-    EDIT_BRANCH="concept/${CONCEPT_NAME}"
+    CONCEPT_BRANCH="concepts/${CONCEPT_NAME}"
     
     # Fetch latest
     git fetch origin
     
-    # Check if edit branch exists
-    if git show-ref --verify --quiet "refs/heads/${EDIT_BRANCH}"; then
-        echo "   Existing edit branch found"
-        git checkout "${EDIT_BRANCH}"
-        git pull origin "${EDIT_BRANCH}" 2>/dev/null || true
-    else
-        echo "   Creating new edit branch..."
+    # Check if concept branch exists (v2.2 style)
+    if git show-ref --verify --quiet "refs/heads/${CONCEPT_BRANCH}" || \
+       git show-ref --verify --quiet "refs/remotes/origin/${CONCEPT_BRANCH}"; then
+        echo "   Found concept branch: ${CONCEPT_BRANCH}"
         
-        # Branch from focus group branch
-        if git show-ref --verify --quiet "refs/heads/${FG_BRANCH}"; then
-            git checkout "${FG_BRANCH}"
-            git pull origin "${FG_BRANCH}"
+        if git show-ref --verify --quiet "refs/heads/${CONCEPT_BRANCH}"; then
+            git checkout "${CONCEPT_BRANCH}"
         else
-            # Focus group branch doesn't exist, create from develop
-            echo "   Note: Creating focus group branch from develop"
-            git checkout develop
-            git pull origin develop
-            git checkout -b "${FG_BRANCH}"
-            git push -u origin "${FG_BRANCH}"
+            git checkout -b "${CONCEPT_BRANCH}" "origin/${CONCEPT_BRANCH}"
+        fi
+        git pull origin "${CONCEPT_BRANCH}" 2>/dev/null || true
+        
+        # Check for worktree
+        WORKTREE_PATH="worktrees/${CONCEPT_NAME}"
+        if [ -d "$WORKTREE_PATH" ]; then
+            echo ""
+            echo "📂 Worktree available: ${WORKTREE_PATH}"
+            echo "   cd ${WORKTREE_PATH} to work there"
+        else
+            echo ""
+            echo "💡 Create a worktree for easier development:"
+            echo "   git worktree add worktrees/${CONCEPT_NAME} ${CONCEPT_BRANCH}"
+        fi
+    else
+        # Legacy: concept branch doesn't exist, use old edit branch pattern
+        EDIT_BRANCH="concept/${CONCEPT_NAME}"
+        
+        if git show-ref --verify --quiet "refs/heads/${EDIT_BRANCH}"; then
+            echo "   Found legacy edit branch: ${EDIT_BRANCH}"
+            git checkout "${EDIT_BRANCH}"
+            git pull origin "${EDIT_BRANCH}" 2>/dev/null || true
+        else
+            echo "   Creating edit branch from focus group..."
+            
+            # Branch from focus group branch
+            if git show-ref --verify --quiet "refs/heads/${FG_BRANCH}" || \
+               git show-ref --verify --quiet "refs/remotes/origin/${FG_BRANCH}"; then
+                if git show-ref --verify --quiet "refs/heads/${FG_BRANCH}"; then
+                    git checkout "${FG_BRANCH}"
+                else
+                    git checkout -b "${FG_BRANCH}" "origin/${FG_BRANCH}"
+                fi
+                git pull origin "${FG_BRANCH}" 2>/dev/null || true
+            else
+                # Focus group branch doesn't exist, create from develop
+                echo "   Note: Creating focus group branch from develop"
+                git checkout develop
+                git pull origin develop
+                git checkout -b "${FG_BRANCH}"
+                git push -u origin "${FG_BRANCH}"
+            fi
+            
+            # Create edit branch
+            git checkout -b "${EDIT_BRANCH}"
+            echo "   Created: ${EDIT_BRANCH}"
         fi
         
-        # Create edit branch
-        git checkout -b "${EDIT_BRANCH}"
-        echo "   Created: ${EDIT_BRANCH}"
+        echo ""
+        echo "💡 Consider upgrading to v2.2 concept branch:"
+        echo "   /wgsd migrate-concept ${CONCEPT_NAME}"
     fi
     
     echo ""
     echo "✅ Ready to edit concept"
     echo ""
-    echo "**Edit the concept file:**"
-    echo "  ${CONCEPT_FILE}"
+    
+    if [ "$CONCEPT_TYPE" = "directory" ]; then
+        echo "**Edit concept artifacts:**"
+        echo "  ${CONCEPT_PATH}/CONCEPT.md       ← Main description"
+        echo "  ${CONCEPT_PATH}/impact-matrix.md ← Cross-cutting impacts"
+        ls -1 "${CONCEPT_PATH}/" 2>/dev/null | grep -v "CONCEPT.md\|impact-matrix.md" | while read f; do
+            echo "  ${CONCEPT_PATH}/$f"
+        done
+    else
+        echo "**Edit the concept file:**"
+        echo "  ${CONCEPT_FILE}"
+    fi
+    
     echo ""
     echo "**When done:**"
-    echo "  git add ${CONCEPT_FILE}"
+    if [ "$CONCEPT_TYPE" = "directory" ]; then
+        echo "  git add ${CONCEPT_PATH}/"
+    else
+        echo "  git add ${CONCEPT_FILE}"
+    fi
     echo "  git commit -m \"docs(${FOCUS_GROUP}): update ${CONCEPT_NAME} concept\""
     echo "  /wgsd concept pr ${CONCEPT_NAME}"
     exit 0
@@ -166,18 +251,27 @@ if [ "$ACTION" = "pr" ]; then
     echo ""
     echo "📤 Creating planning PR..."
     
-    EDIT_BRANCH="concept/${CONCEPT_NAME}"
+    # Determine branch based on v2.2 or legacy format
+    CONCEPT_BRANCH="concepts/${CONCEPT_NAME}"
+    LEGACY_BRANCH="concept/${CONCEPT_NAME}"
     FG_BRANCH="focus-groups/${FOCUS_GROUP}"
     
-    # Verify we're on the edit branch
+    # Verify we're on a concept-related branch
     CURRENT_BRANCH=$(git branch --show-current)
-    if [ "$CURRENT_BRANCH" != "$EDIT_BRANCH" ]; then
+    
+    # Accept either v2.2 or legacy branch naming
+    if [ "$CURRENT_BRANCH" = "$CONCEPT_BRANCH" ]; then
+        EDIT_BRANCH="$CONCEPT_BRANCH"
+    elif [ "$CURRENT_BRANCH" = "$LEGACY_BRANCH" ]; then
+        EDIT_BRANCH="$LEGACY_BRANCH"
+        echo "ℹ️  Using legacy branch naming (concept/${CONCEPT_NAME})"
+    else
         echo "⚠️ Not on concept branch"
         echo "   Current: ${CURRENT_BRANCH}"
-        echo "   Expected: ${EDIT_BRANCH}"
+        echo "   Expected: ${CONCEPT_BRANCH} (v2.2) or ${LEGACY_BRANCH} (legacy)"
         echo ""
         echo "💡 Switch to concept branch first:"
-        echo "   git checkout ${EDIT_BRANCH}"
+        echo "   git checkout ${CONCEPT_BRANCH}"
         exit 1
     fi
     

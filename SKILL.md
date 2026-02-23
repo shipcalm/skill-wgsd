@@ -147,10 +147,16 @@ WGSD creates shared planning structure:
 │   ├── security/
 │   │   ├── ROADMAP.md             # Focus group roadmap (↔ Canvas)
 │   │   ├── STATE.md               # Current status
-│   │   ├── concepts/              # Feature concepts
-│   │   │   ├── byof-filesystem.md
-│   │   │   ├── auth-v2.md
-│   │   │   └── sso-integration.md
+│   │   ├── concepts/              # Feature concepts (v2.2 directories)
+│   │   │   ├── byof-filesystem/   # v2.2 concept directory
+│   │   │   │   ├── CONCEPT.md     # Primary concept description
+│   │   │   │   ├── impact-matrix.md  # Cross-cutting impacts
+│   │   │   │   ├── API-SPEC.md    # Optional API spec
+│   │   │   │   └── acceptance-criteria.md  # Optional AC
+│   │   │   ├── auth-v2/
+│   │   │   │   ├── CONCEPT.md
+│   │   │   │   └── impact-matrix.md
+│   │   │   └── sso-integration.md # Legacy single-file (backward compat)
 │   │   └── CHANNELS.md            # Slack channel mappings
 │   ├── onboarding/
 │   │   ├── ROADMAP.md
@@ -181,17 +187,42 @@ WGSD creates shared planning structure:
 
 ## Git Integration
 
-**Branches:**
-- `focus-groups/security` - Planning and concept development
-- `focus-groups/onboarding` - Planning and concept development  
-- `implementations/auth-v2` - Code implementation (off develop)
-- `implementations/billing-api` - Code implementation (off develop)
+**Branch Hierarchy (v2.2):**
+```
+main/develop (primary)
+├── concepts/                      # v2.2 concept branches (medium-lived)
+│   ├── byof-filesystem            # Independent concept development
+│   ├── auth-v2                    # Each concept gets its own branch
+│   └── oauth-integration          # PRs merge to focus-groups/*
+├── focus-groups/                  # Focus group branches (long-lived)
+│   ├── security                   # Planning and roadmap
+│   ├── onboarding                 # Concepts merge here after approval
+│   └── billing                    # Never merges to develop directly
+└── implementations/               # Implementation branches (short-lived)
+    ├── auth-v2-impl               # Code execution (off develop)
+    └── billing-api-impl           # Merges back to develop (1-3 days)
+```
+
+**Concept Branch Flow:**
+```
+concepts/{name}          ← Isolated concept development
+    │
+    ▼ (PR on team approval)
+focus-groups/{fg}        ← Focus group review
+    │
+    ▼ (matrix approval - Phase 12)
+roadmap                  ← Ready for implementation
+```
 
 **Worktrees:**
 ```
 {repo}/
 ├── .git/                          # Main git directory
-├── concepts/                      # Focus group worktrees
+├── worktrees/                     # v2.2 concept worktrees
+│   ├── byof-filesystem/           # → concepts/byof-filesystem branch
+│   ├── auth-v2/                   # → concepts/auth-v2 branch
+│   └── oauth-integration/         # → concepts/oauth-integration branch
+├── concepts/                      # Focus group worktrees (legacy naming)
 │   ├── security/                  # → focus-groups/security branch
 │   ├── onboarding/                # → focus-groups/onboarding branch
 │   └── billing/                   # → focus-groups/billing branch

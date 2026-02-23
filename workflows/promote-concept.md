@@ -35,17 +35,32 @@ REPO_NAME=$(basename $(pwd))
 CONCEPT_NAME="{concept-name}"
 OWNER="{owner}"  # Optional, can be assigned later
 
-# Search for concept across all focus groups
+# Search for concept across all focus groups (supports v2.2 directories and legacy files)
+CONCEPT_PATH=""
 CONCEPT_FILE=""
+CONCEPT_TYPE=""  # "directory" or "file"
 FOCUS_GROUP=""
 
 echo "🔍 Searching for concept: ${CONCEPT_NAME}"
 
 for fg_dir in .planning/focus-groups/*/; do
-    if [ -f "${fg_dir}concepts/${CONCEPT_NAME}.md" ]; then
-        CONCEPT_FILE="${fg_dir}concepts/${CONCEPT_NAME}.md"
+    # Check for v2.2 directory format first
+    if [ -d "${fg_dir}concepts/${CONCEPT_NAME}" ]; then
+        CONCEPT_PATH="${fg_dir}concepts/${CONCEPT_NAME}"
+        CONCEPT_FILE="${CONCEPT_PATH}/CONCEPT.md"
+        CONCEPT_TYPE="directory"
         FOCUS_GROUP=$(basename "$fg_dir")
-        echo "📍 Found: ${CONCEPT_NAME} in ${FOCUS_GROUP} focus group"
+        echo "📍 Found: ${CONCEPT_NAME} in ${FOCUS_GROUP} focus group (v2.2 directory)"
+        break
+    fi
+    
+    # Fall back to legacy single-file format
+    if [ -f "${fg_dir}concepts/${CONCEPT_NAME}.md" ]; then
+        CONCEPT_PATH="${fg_dir}concepts/${CONCEPT_NAME}.md"
+        CONCEPT_FILE="${CONCEPT_PATH}"
+        CONCEPT_TYPE="file"
+        FOCUS_GROUP=$(basename "$fg_dir")
+        echo "📍 Found: ${CONCEPT_NAME} in ${FOCUS_GROUP} focus group (legacy file)"
         break
     fi
 done
@@ -53,9 +68,21 @@ done
 if [ -z "$CONCEPT_FILE" ]; then
     echo "❌ Concept '${CONCEPT_NAME}' not found"
     echo "💡 Available concepts:"
-    find .planning/focus-groups -name "*.md" -path "*/concepts/*" | \
+    # List directories (v2.2)
+    find .planning/focus-groups -mindepth 3 -maxdepth 3 -type d -path "*/concepts/*" 2>/dev/null | \
+        sed 's|.planning/focus-groups/||;s|/concepts/| → |'
+    # List files (legacy)
+    find .planning/focus-groups -name "*.md" -path "*/concepts/*" 2>/dev/null | \
         sed 's|.planning/focus-groups/||;s|/concepts/| → |;s|\.md||'
     exit 1
+fi
+
+# For v2.2 directories, also check for impact-matrix.md
+if [ "$CONCEPT_TYPE" = "directory" ]; then
+    IMPACT_MATRIX="${CONCEPT_PATH}/impact-matrix.md"
+    if [ -f "$IMPACT_MATRIX" ]; then
+        echo "   📊 Impact matrix: ${IMPACT_MATRIX}"
+    fi
 fi
 ```
 

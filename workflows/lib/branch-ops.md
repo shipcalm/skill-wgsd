@@ -15,13 +15,17 @@ Branch strategy enforcement and worktree management for WGSD workspaces.
 
 ```
 main/develop (primary)
+├── concepts/
+│   ├── oauth-integration   ← Concept development (medium-lived)
+│   ├── billing-v2          ← Concept development (medium-lived)
+│   └── dark-mode           ← Concept development (medium-lived)
 ├── focus-groups/
-│   ├── security        ← Planning work (long-lived)
-│   ├── onboarding      ← Planning work (long-lived)
-│   └── billing         ← Planning work (long-lived)
+│   ├── security            ← Planning work (long-lived)
+│   ├── onboarding          ← Planning work (long-lived)
+│   └── billing             ← Planning work (long-lived)
 └── implementations/
-    ├── auth-v2         ← Code execution (short-lived)
-    └── payment-api     ← Code execution (short-lived)
+    ├── auth-v2             ← Code execution (short-lived)
+    └── payment-api         ← Code execution (short-lived)
 ```
 
 ### Branch Rules
@@ -29,8 +33,21 @@ main/develop (primary)
 | Type | Base | Merge Target | Lifetime | Clean Required |
 |------|------|--------------|----------|----------------|
 | Primary | - | - | Permanent | Yes |
+| concepts/* | Primary | focus-groups/* | Medium-lived | No |
 | focus-groups/* | Primary | None | Long-lived | No |
 | implementations/* | Primary | Primary | 1-3 days | Yes |
+
+### Concept Branch Flow (v2.2)
+
+```
+concepts/{name}          ← Concept development happens here
+    │
+    ▼ (PR on approval)
+focus-groups/{fg}        ← Focus group review
+    │
+    ▼ (full approval)
+roadmap                  ← Ready for implementation
+```
 
 ---
 
@@ -101,6 +118,139 @@ ensure_clean_checkout() {
   
   echo "OK: Clean checkout on $(git branch --show-current)"
   return 0
+}
+```
+
+---
+
+## create_concept_branch
+
+Create a concept branch from primary for isolated concept development.
+
+```bash
+# Usage: create_concept_branch <concept-slug>
+# Returns: 0 on success, 1 on error
+create_concept_branch() {
+  local slug="$1"
+  
+  if [ -z "$slug" ]; then
+    echo "ERROR: Concept slug required"
+    return 1
+  fi
+  
+  local primary=$(detect_primary_branch)
+  if [ $? -ne 0 ]; then
+    echo "$primary"
+    return 1
+  fi
+  
+  local branch="concepts/$slug"
+  
+  # Check if branch already exists locally
+  if git rev-parse --verify "$branch" >/dev/null 2>&1; then
+    echo "EXISTS: Branch $branch already exists locally"
+    git checkout "$branch"
+    return 0
+  fi
+  
+  # Check if branch exists on remote
+  if git rev-parse --verify "origin/$branch" >/dev/null 2>&1; then
+    # Checkout from remote
+    git checkout -b "$branch" "origin/$branch" 2>&1
+    if [ $? -eq 0 ]; then
+      echo "OK: Checked out existing remote branch $branch"
+      return 0
+    fi
+  fi
+  
+  # Ensure primary is up to date
+  git fetch origin "$primary" 2>/dev/null
+  git checkout "$primary" 2>/dev/null
+  git pull origin "$primary" 2>/dev/null
+  
+  # Create new branch from primary
+  git checkout -b "$branch" 2>&1
+  
+  if [ $? -eq 0 ]; then
+    echo "OK: Created concept branch $branch from $primary"
+    return 0
+  else
+    echo "ERROR: Failed to create concept branch $branch"
+    return 1
+  fi
+}
+```
+
+---
+
+## delete_concept_branch
+
+Delete a concept branch after concept is promoted or abandoned.
+
+```bash
+# Usage: delete_concept_branch <concept-slug> [--force]
+# Returns: 0 on success, 1 on error
+delete_concept_branch() {
+  local slug="$1"
+  local force="${2:-}"
+  
+  if [ -z "$slug" ]; then
+    echo "ERROR: Concept slug required"
+    return 1
+  fi
+  
+  local branch="concepts/$slug"
+  
+  # Check if branch exists
+  if ! git rev-parse --verify "$branch" >/dev/null 2>&1; then
+    if ! git rev-parse --verify "origin/$branch" >/dev/null 2>&1; then
+      echo "WARNING: Branch $branch does not exist"
+      return 0
+    fi
+  fi
+  
+  # Switch away from branch if currently on it
+  local current=$(git branch --show-current 2>/dev/null)
+  if [ "$current" = "$branch" ]; then
+    local primary=$(detect_primary_branch)
+    git checkout "$primary" 2>/dev/null
+  fi
+  
+  # Check for unmerged commits unless force flag
+  if [ "$force" != "--force" ]; then
+    local unmerged=$(git log "origin/$branch" --not --remotes="origin/*" --oneline 2>/dev/null | head -1)
+    if [ -n "$unmerged" ]; then
+      echo "ERROR: Branch has unmerged commits. Use --force to delete anyway."
+      return 1
+    fi
+  fi
+  
+  # Delete local branch
+  git branch -D "$branch" 2>/dev/null
+  
+  # Delete remote branch
+  git push origin --delete "$branch" 2>/dev/null
+  
+  echo "OK: Deleted concept branch $branch"
+  return 0
+}
+```
+
+---
+
+## list_concept_branches
+
+List all concept branches.
+
+```bash
+# Usage: list_concept_branches
+# Returns: List of concept names (stdout)
+list_concept_branches() {
+  git branch -a 2>/dev/null | \
+    grep "concepts/" | \
+    sed 's|.*concepts/||' | \
+    sed 's|^remotes/origin/||' | \
+    sort -u
 }
 ```
 
@@ -374,6 +524,13 @@ validate_branch_state() {
   fi
   echo "✅ Primary: $primary"
   
+  # List concept branches (v2.2)
+  local concept_count=$(list_concept_branches | wc -l)
+  echo "💡 Concepts: $concept_count"
+  list_concept_branches | while read concept; do
+    echo "   - $concept"
+  done
+  
   # List focus branches
   local focus_count=$(list_focus_branches | wc -l)
   echo "📂 Focus Groups: $focus_count"
@@ -398,6 +555,11 @@ validate_branch_state() {
     warnings=$((warnings + 1))
   fi
   
+  if [ "$concept_count" -gt 10 ]; then
+    echo "   - Many active concepts ($concept_count) - consider consolidating"
+    warnings=$((warnings + 1))
+  fi
+  
   if [ "$warnings" -eq 0 ]; then
     echo "   None"
   fi
@@ -417,6 +579,13 @@ validate_branch_state() {
 PRIMARY=$(detect_primary_branch)
 ensure_clean_checkout "$PRIMARY" || exit 1
 
+# Create concept branch (v2.2)
+create_concept_branch "oauth-integration"
+# Concept branch: concepts/oauth-integration
+
+# Create optional worktree for concept
+setup_worktree "./worktrees/oauth-integration" "concepts/oauth-integration"
+
 # Create focus group with worktree
 create_focus_branch "security"
 setup_worktree "./concepts/security" "focus-groups/security"
@@ -425,10 +594,16 @@ setup_worktree "./concepts/security" "focus-groups/security"
 create_impl_branch "auth-v2"
 setup_worktree "./implementations/auth-v2" "implementations/auth-v2"
 
+# List all concept branches
+list_concept_branches
+
+# Clean up concept branch after promotion
+delete_concept_branch "oauth-integration"
+
 # Validate overall state
 validate_branch_state
 ```
 
 ---
 
-*Library created for WGSD Phase 1*
+*Library updated for WGSD v2.2 - Concept Directory Architecture*

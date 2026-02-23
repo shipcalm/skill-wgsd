@@ -516,12 +516,12 @@ format_queue_list() {
 
 ### format_concepts_list
 
-Format concepts for focus group canvas.
+Format concepts for focus group canvas. Supports v2.2 directories and legacy files.
 
 ```bash
 # Usage: format_concepts_list <repo_path> <focus_group> <status>
 # Arguments:
-#   status - "ready", "active", "proposed"
+#   status - "ready", "active", "proposed", "all"
 # Returns: Formatted markdown list
 format_concepts_list() {
   local repo_path="$1"
@@ -537,13 +537,17 @@ format_concepts_list() {
   
   local result=""
   
-  for concept_file in "$concepts_dir"/*.md; do
+  # Process v2.2 concept directories first
+  for concept_dir in "$concepts_dir"/*/; do
+    [ -d "$concept_dir" ] || continue
+    
+    local name=$(basename "$concept_dir")
+    local concept_file="$concept_dir/CONCEPT.md"
+    
     [ -f "$concept_file" ] || continue
     
-    local name=$(basename "$concept_file" .md)
-    
     # Get status from file
-    local status=$(grep -m1 "^Status:" "$concept_file" 2>/dev/null | cut -d':' -f2 | xargs || echo "proposed")
+    local status=$(grep -m1 "^\*\*Status:\*\*" "$concept_file" 2>/dev/null | sed 's/\*\*Status:\*\*//' | xargs || echo "draft")
     status=$(echo "$status" | tr '[:upper:]' '[:lower:]')
     
     # Filter by status
@@ -552,21 +556,84 @@ format_concepts_list() {
         [[ "$status" == *"ready"* ]] || continue
         ;;
       active)
-        [[ "$status" == *"active"* || "$status" == *"development"* ]] || continue
+        [[ "$status" == *"active"* || "$status" == *"exploring"* || "$status" == *"development"* ]] || continue
         ;;
       proposed)
         [[ "$status" == *"proposed"* || "$status" == *"draft"* ]] || continue
         ;;
+      all)
+        # Include all
+        ;;
+    esac
+    
+    # Count artifacts in directory
+    local artifact_count=$(ls -1 "$concept_dir" 2>/dev/null | wc -l)
+    
+    # Get brief description
+    local desc=""
+    if [ -f "$concept_dir/impact-matrix.md" ]; then
+      local impact_count=$(grep -c "^### Focus Group:" "$concept_dir/impact-matrix.md" 2>/dev/null || echo "0")
+      desc="📁 ${artifact_count} artifacts, 🎯 ${impact_count} impacts"
+    else
+      desc="📁 ${artifact_count} artifacts"
+    fi
+    
+    # Get priority
+    local priority=$(grep -m1 "^\*\*Priority:\*\*" "$concept_file" 2>/dev/null | sed 's/\*\*Priority:\*\*//' | xargs || echo "")
+    
+    # Status emoji
+    local emoji="📝"
+    case "$status" in
+      *"ready"*) emoji="✅" ;;
+      *"exploring"*|*"active"*) emoji="🔍" ;;
+      *"mature"*) emoji="🌟" ;;
+      *"approved"*) emoji="✨" ;;
+    esac
+    
+    if [ -n "$priority" ]; then
+      result="${result}- $emoji **$name** ($priority) - $desc\n"
+    else
+      result="${result}- $emoji **$name** - $desc\n"
+    fi
+  done
+  
+  # Process legacy single-file concepts
+  for concept_file in "$concepts_dir"/*.md; do
+    [ -f "$concept_file" ] || continue
+    
+    local name=$(basename "$concept_file" .md)
+    
+    # Get status from file
+    local status=$(grep -m1 "^\*\*Status:\*\*" "$concept_file" 2>/dev/null | sed 's/\*\*Status:\*\*//' | xargs || echo "draft")
+    status=$(echo "$status" | tr '[:upper:]' '[:lower:]')
+    
+    # Filter by status
+    case "$status_filter" in
+      ready)
+        [[ "$status" == *"ready"* ]] || continue
+        ;;
+      active)
+        [[ "$status" == *"active"* || "$status" == *"exploring"* ]] || continue
+        ;;
+      proposed)
+        [[ "$status" == *"proposed"* || "$status" == *"draft"* ]] || continue
+        ;;
+      all)
+        # Include all
+        ;;
     esac
     
     # Get description
-    local desc=$(grep -m1 "^>" "$concept_file" 2>/dev/null | sed 's/^>//' | xargs || echo "")
+    local desc=$(grep -m1 "^>" "$concept_file" 2>/dev/null | sed 's/^>//' | xargs || echo "📄 legacy")
     
-    if [ -n "$desc" ]; then
-      result="${result}- **$name**: $desc\n"
-    else
-      result="${result}- **$name**\n"
-    fi
+    # Status emoji
+    local emoji="📄"
+    case "$status" in
+      *"ready"*) emoji="✅" ;;
+      *"exploring"*|*"active"*) emoji="🔍" ;;
+    esac
+    
+    result="${result}- $emoji **$name**: $desc\n"
   done
   
   if [ -z "$result" ]; then
@@ -575,6 +642,111 @@ format_concepts_list() {
     echo -e "$result"
   fi
   
+  return 0
+}
+```
+
+---
+
+### format_concept_detail
+
+Format a single concept directory for detailed display on canvas.
+
+```bash
+# Usage: format_concept_detail <repo_path> <focus_group> <concept_name>
+# Returns: Detailed markdown content for canvas
+format_concept_detail() {
+  local repo_path="$1"
+  local fg_name="$2"
+  local concept_name="$3"
+  
+  local concept_dir="$repo_path/.planning/focus-groups/$fg_name/concepts/$concept_name"
+  local concept_file="$concept_dir/CONCEPT.md"
+  
+  # Handle legacy format
+  if [ ! -d "$concept_dir" ]; then
+    concept_file="$repo_path/.planning/focus-groups/$fg_name/concepts/${concept_name}.md"
+    if [ -f "$concept_file" ]; then
+      cat "$concept_file"
+      return 0
+    fi
+    echo "Concept not found: $concept_name"
+    return 1
+  fi
+  
+  local result=""
+  
+  # Header with concept name and key metadata
+  local status=$(grep -m1 "^\*\*Status:\*\*" "$concept_file" 2>/dev/null | sed 's/\*\*Status:\*\*//' | xargs || echo "Draft")
+  local priority=$(grep -m1 "^\*\*Priority:\*\*" "$concept_file" 2>/dev/null | sed 's/\*\*Priority:\*\*//' | xargs || echo "")
+  local branch=$(grep -m1 "^\*\*Branch:\*\*" "$concept_file" 2>/dev/null | sed 's/\*\*Branch:\*\*//' | xargs || echo "")
+  
+  result+="## 💡 $concept_name\n\n"
+  result+="**Status:** $status"
+  [ -n "$priority" ] && result+=" | **Priority:** $priority"
+  [ -n "$branch" ] && result+=" | **Branch:** $branch"
+  result+="\n\n"
+  
+  # Include CONCEPT.md content (trimmed)
+  result+="### Overview\n\n"
+  # Extract just the overview/problem sections
+  local overview=$(sed -n '/## Problem Statement/,/## Dependencies/p' "$concept_file" 2>/dev/null | head -30)
+  if [ -n "$overview" ]; then
+    result+="$overview\n\n"
+  fi
+  
+  # Include impact matrix summary if exists
+  local impact_file="$concept_dir/impact-matrix.md"
+  if [ -f "$impact_file" ]; then
+    result+="### 📊 Impact Matrix\n\n"
+    # Extract impact summary table
+    local summary=$(sed -n '/## Impact Summary/,/## Approval/p' "$impact_file" 2>/dev/null | head -15)
+    if [ -n "$summary" ]; then
+      result+="$summary\n\n"
+    fi
+  fi
+  
+  # List other artifacts
+  result+="### 📎 Related Artifacts\n\n"
+  local has_artifacts=false
+  
+  for artifact in "$concept_dir"/*; do
+    [ -f "$artifact" ] || continue
+    local artifact_name=$(basename "$artifact")
+    
+    case "$artifact_name" in
+      CONCEPT.md|impact-matrix.md)
+        continue  # Already shown inline
+        ;;
+      API-SPEC.md)
+        result+="- 📡 [API Specification]($artifact_name)\n"
+        has_artifacts=true
+        ;;
+      acceptance-criteria.md)
+        result+="- ✅ [Acceptance Criteria]($artifact_name)\n"
+        has_artifacts=true
+        ;;
+      *.md)
+        result+="- 📄 [$artifact_name]($artifact_name)\n"
+        has_artifacts=true
+        ;;
+    esac
+  done
+  
+  # Check for wireframes directory
+  if [ -d "$concept_dir/wireframes" ]; then
+    local wireframe_count=$(ls -1 "$concept_dir/wireframes" 2>/dev/null | wc -l)
+    result+="- 🎨 [Wireframes ($wireframe_count files)](wireframes/)\n"
+    has_artifacts=true
+  fi
+  
+  if [ "$has_artifacts" = false ]; then
+    result+="*No additional artifacts*\n"
+  fi
+  
+  result+="\n---\n"
+  
+  echo -e "$result"
   return 0
 }
 ```

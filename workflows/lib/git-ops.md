@@ -272,6 +272,145 @@ git_worktree_list() {
 
 ---
 
+## git_concept_worktree_add
+
+Create a worktree specifically for concept development.
+
+```bash
+# Usage: git_concept_worktree_add <concept-slug>
+# Creates: worktrees/{concept-slug}/ pointing to concepts/{concept-slug} branch
+git_concept_worktree_add() {
+  local slug="$1"
+  
+  if [ -z "$slug" ]; then
+    echo "ERROR: Concept slug required"
+    return 1
+  fi
+  
+  local path="worktrees/$slug"
+  local branch="concepts/$slug"
+  
+  # Check if worktree already exists
+  if [ -d "$path" ]; then
+    if [ -f "$path/.git" ]; then
+      echo "EXISTS: Concept worktree at $path already exists"
+      return 0
+    else
+      echo "ERROR: Directory exists but is not a worktree: $path"
+      return 1
+    fi
+  fi
+  
+  # Validate branch exists
+  if ! git rev-parse --verify "$branch" >/dev/null 2>&1; then
+    # Check remote
+    if git rev-parse --verify "origin/$branch" >/dev/null 2>&1; then
+      # Fetch and create local tracking branch
+      git fetch origin "$branch"
+      git branch "$branch" "origin/$branch" 2>/dev/null
+    else
+      echo "ERROR: Concept branch $branch does not exist"
+      echo "HINT: Create concept first with /wgsd create-concept"
+      return 1
+    fi
+  fi
+  
+  # Create worktrees directory if needed
+  mkdir -p "worktrees"
+  
+  # Add .gitignore for worktrees directory
+  if [ ! -f "worktrees/.gitignore" ]; then
+    echo "*" > "worktrees/.gitignore"
+    echo "!.gitignore" >> "worktrees/.gitignore"
+  fi
+  
+  git worktree add "$path" "$branch" 2>&1
+  
+  if [ $? -eq 0 ]; then
+    echo "SUCCESS: Created concept worktree at $path"
+    echo "BRANCH: $branch"
+    echo ""
+    echo "To work on this concept:"
+    echo "  cd $path"
+    return 0
+  else
+    echo "ERROR: Failed to create concept worktree"
+    return 1
+  fi
+}
+```
+
+---
+
+## git_concept_worktree_remove
+
+Remove a concept worktree safely.
+
+```bash
+# Usage: git_concept_worktree_remove <concept-slug>
+git_concept_worktree_remove() {
+  local slug="$1"
+  
+  if [ -z "$slug" ]; then
+    echo "ERROR: Concept slug required"
+    return 1
+  fi
+  
+  local path="worktrees/$slug"
+  
+  if [ ! -d "$path" ]; then
+    echo "WARNING: Concept worktree does not exist: $path"
+    return 0
+  fi
+  
+  # Check for uncommitted changes
+  if [ -f "$path/.git" ]; then
+    local dirty=$(cd "$path" && git status --porcelain 2>/dev/null | wc -l)
+    
+    if [ "$dirty" -gt 0 ]; then
+      echo "ERROR: Concept worktree has uncommitted changes"
+      echo ""
+      echo "Uncommitted files in $path:"
+      (cd "$path" && git status --porcelain)
+      echo ""
+      echo "HINT: Commit or stash changes before removing"
+      return 1
+    fi
+  fi
+  
+  git worktree remove "$path" --force 2>&1
+  
+  if [ $? -eq 0 ]; then
+    echo "SUCCESS: Removed concept worktree at $path"
+    return 0
+  else
+    echo "ERROR: Failed to remove concept worktree"
+    return 1
+  fi
+}
+```
+
+---
+
+## git_list_concept_worktrees
+
+List all concept worktrees.
+
+```bash
+# Usage: git_list_concept_worktrees
+# Returns: List of concept slugs that have worktrees
+git_list_concept_worktrees() {
+  if [ -d "worktrees" ]; then
+    git worktree list --porcelain 2>/dev/null | \
+      grep "^worktree.*worktrees/" | \
+      sed 's|.*worktrees/||' | \
+      sort -u
+  fi
+}
+```
+
+---
+
 ## Usage Example
 
 ```bash
@@ -289,8 +428,24 @@ echo "Repository: $SYNC"
 
 # Create worktree for focus group
 git_worktree_add "./concepts/security" "focus-groups/security"
+
+# Create concept worktree (v2.2)
+git_concept_worktree_add "oauth-integration"
+# Creates: worktrees/oauth-integration/ → concepts/oauth-integration
+
+# Work in concept worktree
+cd worktrees/oauth-integration
+# Make changes...
+git add . && git commit -m "Update concept"
+cd ../..
+
+# List concept worktrees
+git_list_concept_worktrees
+
+# Clean up after concept is promoted
+git_concept_worktree_remove "oauth-integration"
 ```
 
 ---
 
-*Library created for WGSD Phase 1*
+*Library updated for WGSD v2.2 - Concept Directory Architecture*

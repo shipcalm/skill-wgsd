@@ -1,15 +1,17 @@
 # Concept Directory Template
 
-This directory contains templates for WGSD concept directories.
+**WGSD v2.2 - Concept Directory Architecture**
+
+This directory contains templates for WGSD concept directories. In v2.2, concepts are directories containing multiple artifacts rather than single files.
 
 ## Template Files
 
 | File | Required | Purpose |
 |------|----------|---------|
 | `CONCEPT.md.tmpl` | ✅ Yes | Core concept description |
-| `impact-matrix.md.tmpl` | ✅ Yes | Cross-cutting impact declarations |
-| `API-SPEC.md.tmpl` | ⏳ Optional | API specification template |
-| `acceptance-criteria.md.tmpl` | ⏳ Optional | Detailed acceptance criteria |
+| `impact-matrix.md.tmpl` | ✅ Yes | Cross-cutting impact declarations (Phase 11) |
+| `API-SPEC.md.tmpl` | ⏳ Optional | API specification for technical concepts |
+| `acceptance-criteria.md.tmpl` | ⏳ Optional | Detailed acceptance criteria with user stories |
 
 ## Template Variables
 
