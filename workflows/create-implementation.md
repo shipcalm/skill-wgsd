@@ -318,7 +318,65 @@ EOF
 echo "   Created: STATE.md"
 ```
 
-## Step 7: Create Git Branch and Worktree
+## Step 7: Verify Concept is on Roadmap (Phase 13)
+
+```bash
+echo ""
+echo "📋 Verifying concept is on roadmap..."
+
+# Phase 13: Implementations must branch from roadmap
+# First, ensure roadmap branch exists
+if ! git rev-parse --verify roadmap >/dev/null 2>&1; then
+    if git rev-parse --verify origin/roadmap >/dev/null 2>&1; then
+        git checkout -b roadmap origin/roadmap 2>/dev/null
+        git checkout "$(git branch --show-current)" 2>/dev/null
+        echo "   Fetched roadmap branch from remote"
+    else
+        echo "⚠️ Roadmap branch does not exist"
+        echo "   Run '/wgsd init' to create it, or use --from-develop for emergency bypass"
+        
+        if [ -z "$BYPASS_ROADMAP" ]; then
+            echo ""
+            echo "❌ Cannot create implementation without roadmap branch"
+            echo "   Concepts must be fully approved and merged to roadmap first."
+            exit 1
+        fi
+    fi
+fi
+
+# Check if concept is on roadmap
+ON_ROADMAP=false
+if git show "roadmap:.planning/ROADMAP-MANIFEST.md" 2>/dev/null | grep -q "| ${CONCEPT_NAME} |"; then
+    ON_ROADMAP=true
+    echo "✅ Concept found on roadmap"
+fi
+
+if [ "$ON_ROADMAP" = false ]; then
+    echo ""
+    echo "⚠️ Concept '${CONCEPT_NAME}' is not on the roadmap branch"
+    echo ""
+    echo "This means either:"
+    echo "  1. The concept hasn't been fully approved yet"
+    echo "  2. The merge to roadmap hasn't completed"
+    echo ""
+    echo "Check approval status:"
+    echo "  /wgsd status ${CONCEPT_NAME}"
+    echo ""
+    echo "If the concept is ready, merge it to roadmap:"
+    echo "  /wgsd merge-to-roadmap ${CONCEPT_NAME}"
+    echo ""
+    
+    if [ -z "$BYPASS_ROADMAP" ]; then
+        echo "To bypass roadmap requirement (emergency only):"
+        echo "  Set BYPASS_ROADMAP=1 or use --from-develop flag"
+        exit 1
+    else
+        echo "⚠️ BYPASS: Proceeding without roadmap verification"
+    fi
+fi
+```
+
+## Step 8: Create Git Branch and Worktree (Phase 13: from roadmap)
 
 ```bash
 echo ""
@@ -328,8 +386,18 @@ echo "🌿 Setting up git branch and worktree..."
 CURRENT_BRANCH=$(git branch --show-current)
 git stash push -m "WGSD: temp stash for implementation creation" 2>/dev/null || true
 
-git checkout develop 2>/dev/null || git checkout main
-git pull origin HEAD
+# Phase 13: Branch from roadmap, not develop
+if [ "$ON_ROADMAP" = true ] && [ -z "$BYPASS_ROADMAP" ]; then
+    BASE_BRANCH="roadmap"
+    echo "   Base branch: roadmap (Phase 13 three-tier branching)"
+else
+    BASE_BRANCH=$(git rev-parse --verify develop >/dev/null 2>&1 && echo "develop" || echo "main")
+    echo "   Base branch: ${BASE_BRANCH} (emergency bypass)"
+fi
+
+# Checkout and update base branch
+git checkout "$BASE_BRANCH" 2>/dev/null
+git pull origin "$BASE_BRANCH" 2>/dev/null || true
 
 # Create implementation branch
 IMPL_BRANCH="implementations/${CONCEPT_NAME}"
@@ -338,13 +406,31 @@ if git show-ref --verify --quiet "refs/heads/${IMPL_BRANCH}"; then
     echo "   Branch exists, checking out..."
     git checkout "${IMPL_BRANCH}"
 else
-    echo "   Creating branch: ${IMPL_BRANCH}"
+    echo "   Creating branch: ${IMPL_BRANCH} (from ${BASE_BRANCH})"
     git checkout -b "${IMPL_BRANCH}"
     
     # Add placeholder file
-    echo "# Implementation: ${CONCEPT_NAME}" > ".impl-${CONCEPT_NAME}.md"
+    cat > ".impl-${CONCEPT_NAME}.md" << EOF
+# Implementation: ${CONCEPT_NAME}
+
+**Base Branch:** ${BASE_BRANCH}
+**Created:** $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+**Concept Source:** ${FOCUS_GROUP}
+
+---
+
+This implementation branch was created from the ${BASE_BRANCH} branch,
+which contains the fully approved concept.
+
+## Merge Target
+
+When complete, this branch will merge to:
+- **develop/main** (production code)
+
+The roadmap branch will be synced via \`/wgsd roadmap-sync\`.
+EOF
     git add ".impl-${CONCEPT_NAME}.md"
-    git commit -m "feat: start ${CONCEPT_NAME} implementation"
+    git commit -m "feat: start ${CONCEPT_NAME} implementation (from ${BASE_BRANCH})"
     git push -u origin "${IMPL_BRANCH}"
 fi
 
@@ -365,6 +451,7 @@ git stash pop 2>/dev/null || true
 
 echo "✅ Git structure ready"
 echo "   Branch: ${IMPL_BRANCH}"
+echo "   Base: ${BASE_BRANCH}"
 echo "   Worktree: ${WORKTREE_PATH}/"
 ```
 

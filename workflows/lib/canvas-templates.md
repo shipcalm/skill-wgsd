@@ -1246,4 +1246,259 @@ canvas=$(build_concept_canvas_content "/path/to/repo" "security" "oauth-integrat
 
 ---
 
+## Template: Roadmap Canvas (Phase 13)
+
+Generate roadmap Canvas showing approved concepts backlog.
+
+```bash
+# Usage: template_roadmap_canvas
+# Returns: Roadmap canvas template
+template_roadmap_canvas() {
+  cat << 'TEMPLATE'
+# 📋 {PROJECT} Roadmap
+
+> **Approved Concepts Ready for Implementation**
+
+---
+
+## 📊 Overview
+
+| Metric | Count |
+|--------|-------|
+| Total on Roadmap | {TOTAL_CONCEPTS} |
+| In Implementation | {IN_PROGRESS} |
+| Awaiting Start | {AWAITING_START} |
+
+---
+
+## ✅ Approved Concepts
+
+{APPROVED_CONCEPTS_TABLE}
+
+---
+
+## 🚀 Implementation Capacity
+
+**Active Implementations:** {ACTIVE_COUNT}/{MAX_COUNT}
+
+{CAPACITY_STATUS}
+
+---
+
+## 🔄 How Concepts Reach Roadmap
+
+```
+concepts/{name}          ← Concept development
+    │
+    ▼ (PR on approval)
+focus-groups/{fg}        ← Focus group review
+    │
+    ▼ (full matrix approval)
+roadmap                  ← You are here ✓
+    │
+    ▼ (create-implementation)
+implementations/{name}   ← Code execution
+```
+
+---
+
+## ⚡ Quick Actions
+
+- **Start Implementation:** `/wgsd create-implementation <concept>`
+- **View Roadmap Branch:** `git checkout roadmap`
+- **Sync to Develop:** `/wgsd roadmap-sync`
+- **Check Status:** `/wgsd status`
+
+---
+
+*Branch:* `roadmap` | *Updated:* {TIMESTAMP}
+
+*This canvas shows approved concepts from the roadmap branch.*
+*To sync develop: `/wgsd roadmap-sync`*
+TEMPLATE
+}
+```
+
+---
+
+### build_roadmap_canvas_content
+
+Build complete roadmap canvas content from repo state.
+
+```bash
+# Usage: build_roadmap_canvas_content <repo_path> <project_name> <stub>
+# Returns: Complete markdown content for roadmap canvas
+build_roadmap_canvas_content() {
+  local repo_path="$1"
+  local project_name="$2"
+  local stub="$3"
+  
+  local template=$(template_roadmap_canvas)
+  
+  # Count concepts on roadmap
+  local total_concepts=0
+  local manifest_file="$repo_path/.planning/ROADMAP-MANIFEST.md"
+  
+  if [ -f "$manifest_file" ]; then
+    total_concepts=$(grep -E "^\| [a-z]" "$manifest_file" 2>/dev/null | wc -l)
+  fi
+  
+  # Count implementations
+  local in_progress=0
+  local impl_dir="$repo_path/.planning/active-implementations"
+  if [ -d "$impl_dir" ]; then
+    in_progress=$(find "$impl_dir" -maxdepth 1 -type d ! -name "active-implementations" 2>/dev/null | wc -l)
+  fi
+  
+  local awaiting=$((total_concepts - in_progress))
+  if [ $awaiting -lt 0 ]; then awaiting=0; fi
+  
+  # Max implementations
+  local max_count=4
+  
+  # Capacity status message
+  local capacity_status=""
+  if [ $in_progress -lt $max_count ]; then
+    local available=$((max_count - in_progress))
+    capacity_status="✅ **Slots Available:** ${available} — Ready to start new implementations
+
+\`\`\`
+/wgsd create-implementation <concept-name>
+\`\`\`"
+  else
+    capacity_status="⚠️ **At Capacity** — Complete current implementations before starting new ones"
+  fi
+  
+  # Build approved concepts table
+  local concepts_table=""
+  if [ -f "$manifest_file" ]; then
+    concepts_table="| Priority | Concept | Focus Group | Approved | Status |
+|----------|---------|-------------|----------|--------|"
+    
+    while IFS='|' read -r _ concept approved impacts priority _; do
+      # Skip header rows
+      [[ "$concept" == *"Concept"* ]] && continue
+      [[ "$concept" == *"---"* ]] && continue
+      [[ -z "$concept" ]] && continue
+      
+      concept=$(echo "$concept" | xargs)
+      approved=$(echo "$approved" | xargs)
+      impacts=$(echo "$impacts" | xargs)
+      priority=$(echo "$priority" | xargs)
+      
+      # Skip if not a real concept entry
+      [[ ! "$concept" =~ ^[a-z] ]] && continue
+      
+      # Determine status
+      local status="🟡 Awaiting"
+      if [ -d "$impl_dir/$concept-impl" ] || [ -d "$impl_dir/$concept" ]; then
+        status="🔵 In Progress"
+      fi
+      
+      # Find focus group
+      local fg="—"
+      for fg_dir in "$repo_path/.planning/focus-groups"/*/; do
+        if [ -d "${fg_dir}concepts/${concept}" ] || [ -f "${fg_dir}concepts/${concept}.md" ]; then
+          fg=$(basename "$fg_dir")
+          break
+        fi
+      done
+      
+      concepts_table="${concepts_table}
+| ${priority:-P1} | **${concept}** | ${fg} | ${approved:-—} | ${status} |"
+    done < "$manifest_file"
+  else
+    concepts_table="*No concepts on roadmap yet*
+
+Concepts appear here after receiving full matrix approval.
+See: \`/wgsd status\` to check approval progress."
+  fi
+  
+  local timestamp=$(date -u +"%Y-%m-%d %H:%M UTC")
+  
+  # Build variables JSON
+  local vars=$(jq -n \
+    --arg project "$project_name" \
+    --arg stub "$stub" \
+    --arg total "$total_concepts" \
+    --arg progress "$in_progress" \
+    --arg awaiting "$awaiting" \
+    --arg active "$in_progress" \
+    --arg max "$max_count" \
+    --arg capacity "$capacity_status" \
+    --arg concepts "$concepts_table" \
+    --arg timestamp "$timestamp" \
+    '{
+      PROJECT: $project,
+      STUB: $stub,
+      TOTAL_CONCEPTS: $total,
+      IN_PROGRESS: $progress,
+      AWAITING_START: $awaiting,
+      ACTIVE_COUNT: $active,
+      MAX_COUNT: $max,
+      CAPACITY_STATUS: $capacity,
+      APPROVED_CONCEPTS_TABLE: $concepts,
+      TIMESTAMP: $timestamp
+    }')
+  
+  template_render "$template" "$vars"
+}
+```
+
+---
+
+### update_roadmap_canvas
+
+Update or create roadmap canvas in Slack channel.
+
+```bash
+# Usage: update_roadmap_canvas <repo_path> <project_name> <stub> <channel_id> [canvas_id]
+# Returns: Canvas ID on success
+update_roadmap_canvas() {
+  local repo_path="$1"
+  local project_name="$2"
+  local stub="$3"
+  local channel_id="$4"
+  local canvas_id="${5:-}"
+  
+  # Generate content
+  local content=$(build_roadmap_canvas_content "$repo_path" "$project_name" "$stub")
+  
+  # Escape content for JSON
+  local escaped_content=$(echo "$content" | jq -Rs .)
+  
+  if [ -n "$canvas_id" ]; then
+    # Update existing canvas
+    curl -s -X POST "https://slack.com/api/canvases.edit" \
+      -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d "{
+        \"canvas_id\": \"${canvas_id}\",
+        \"changes\": [{
+          \"operation\": \"replace\",
+          \"document_content\": {
+            \"type\": \"markdown\",
+            \"markdown\": ${escaped_content}
+          }
+        }]
+      }"
+  else
+    # Create new channel canvas
+    curl -s -X POST "https://slack.com/api/conversations.canvases.create" \
+      -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d "{
+        \"channel_id\": \"${channel_id}\",
+        \"document_content\": {
+          \"type\": \"markdown\",
+          \"markdown\": ${escaped_content}
+        }
+      }"
+  fi
+}
+```
+
+---
+
 *Library enhanced for WGSD Phase 12 - Matrix-Based Approval System*
+*Library enhanced for WGSD Phase 13 - Roadmap Branch Architecture*

@@ -33,9 +33,10 @@ main/develop (primary)
 | Type | Base | Merge Target | Lifetime | Clean Required |
 |------|------|--------------|----------|----------------|
 | Primary | - | - | Permanent | Yes |
-| concepts/* | Primary | focus-groups/* | Medium-lived | No |
+| roadmap | Primary | None | Permanent | Yes |
+| concepts/* | Primary | roadmap (via approval) | Medium-lived | No |
 | focus-groups/* | Primary | None | Long-lived | No |
-| implementations/* | Primary | Primary | 1-3 days | Yes |
+| implementations/* | **roadmap** | Primary | 1-3 days | Yes |
 
 ### Concept Branch Flow (v2.2)
 
@@ -45,8 +46,29 @@ concepts/{name}          ← Concept development happens here
     ▼ (PR on approval)
 focus-groups/{fg}        ← Focus group review
     │
-    ▼ (full approval)
-roadmap                  ← Ready for implementation
+    ▼ (full matrix approval)
+roadmap                  ← Approved backlog (auto-merge on completion)
+    │
+    ▼ (create-implementation)
+implementations/{name}   ← Code execution (branches FROM roadmap)
+    │
+    ▼ (merge)
+develop/main            ← Production code
+```
+
+### Three-Tier Branching (Phase 13)
+
+```
+main/develop (primary)
+├── roadmap                        # Approved concepts backlog (permanent)
+├── concepts/                      # Concept branches
+│   ├── oauth-integration          
+│   └── billing-v2                
+├── focus-groups/                  # Focus group branches
+│   ├── security                   
+│   └── billing                   
+└── implementations/               # Branch FROM roadmap
+    └── auth-v2-impl               
 ```
 
 ---
@@ -311,31 +333,139 @@ create_focus_branch() {
 
 ---
 
-## create_impl_branch
+## ensure_roadmap_branch
 
-Create an implementation branch from primary (requires clean state).
+Create roadmap branch if missing, returns branch name.
 
 ```bash
-# Usage: create_impl_branch <name>
+# Usage: ensure_roadmap_branch
+# Returns: "roadmap" on stdout, 0 on success
+ensure_roadmap_branch() {
+  local primary=$(detect_primary_branch)
+  
+  # Check local
+  if git rev-parse --verify roadmap >/dev/null 2>&1; then
+    echo "roadmap"
+    return 0
+  fi
+  
+  # Check remote
+  if git rev-parse --verify origin/roadmap >/dev/null 2>&1; then
+    git checkout -b roadmap origin/roadmap 2>/dev/null
+    git checkout "$primary" 2>/dev/null
+    echo "roadmap"
+    return 0
+  fi
+  
+  # Create from primary
+  git checkout "$primary" 2>/dev/null
+  git pull origin "$primary" 2>/dev/null
+  git checkout -b roadmap 2>/dev/null
+  
+  # Initialize manifest
+  mkdir -p .planning
+  cat > .planning/ROADMAP-MANIFEST.md << EOF
+# Roadmap Manifest
+
+**Branch:** roadmap
+**Created:** $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+## Approved Concepts
+
+| Concept | Approval Date | Impacts | Priority |
+|---------|---------------|---------|----------|
+
+## Sync History
+
+| Date | Type | Details |
+|------|------|---------|
+EOF
+  
+  git add .planning/ROADMAP-MANIFEST.md
+  git commit -m "docs: initialize roadmap branch"
+  git push -u origin roadmap 2>/dev/null || true
+  
+  git checkout "$primary" 2>/dev/null
+  echo "roadmap"
+  return 0
+}
+```
+
+---
+
+## is_on_roadmap
+
+Check if a concept has been merged to roadmap.
+
+```bash
+# Usage: is_on_roadmap <concept-slug>
+# Returns: 0 if on roadmap, 1 if not
+is_on_roadmap() {
+  local concept_slug="$1"
+  
+  # Check if concept directory exists on roadmap branch
+  local roadmap_exists=$(git ls-tree -d roadmap --name-only 2>/dev/null | grep -c "concepts/${concept_slug}$" || echo "0")
+  
+  # Also check manifest
+  local in_manifest="0"
+  if git show roadmap:.planning/ROADMAP-MANIFEST.md >/dev/null 2>&1; then
+    in_manifest=$(git show roadmap:.planning/ROADMAP-MANIFEST.md 2>/dev/null | grep -c "| ${concept_slug} |" || echo "0")
+  fi
+  
+  if [ "$roadmap_exists" -gt 0 ] || [ "$in_manifest" -gt 0 ]; then
+    return 0  # On roadmap
+  fi
+  
+  return 1  # Not on roadmap
+}
+```
+
+---
+
+## get_roadmap_concepts
+
+List all concepts currently on the roadmap branch.
+
+```bash
+# Usage: get_roadmap_concepts
+# Returns: List of concept names (one per line)
+get_roadmap_concepts() {
+  if ! git rev-parse --verify roadmap >/dev/null 2>&1; then
+    echo ""
+    return 1
+  fi
+  
+  # Parse from manifest
+  if git show roadmap:.planning/ROADMAP-MANIFEST.md >/dev/null 2>&1; then
+    git show roadmap:.planning/ROADMAP-MANIFEST.md 2>/dev/null | \
+      grep -E "^\| [a-z]" | \
+      cut -d'|' -f2 | \
+      xargs -n1 | \
+      sort -u
+  fi
+  
+  return 0
+}
+```
+
+---
+
+## create_impl_branch
+
+Create an implementation branch from **roadmap** (Phase 13: requires clean state and concept on roadmap).
+
+```bash
+# Usage: create_impl_branch <name> [--from-develop]
+# Arguments:
+#   name           - Implementation branch name
+#   --from-develop - Emergency mode: branch from develop instead of roadmap
 # Returns: 0 on success, 1 on error
 create_impl_branch() {
   local name="$1"
+  local force_from_develop="${2:-}"
   
   if [ -z "$name" ]; then
     echo "ERROR: Implementation branch name required"
-    return 1
-  fi
-  
-  local primary=$(detect_primary_branch)
-  if [ $? -ne 0 ]; then
-    echo "$primary"
-    return 1
-  fi
-  
-  # Ensure clean checkout first
-  local clean_result=$(ensure_clean_checkout "$primary")
-  if [ $? -ne 0 ]; then
-    echo "$clean_result"
     return 1
   fi
   
@@ -348,11 +478,41 @@ create_impl_branch() {
     return 1
   fi
   
-  # Create branch from primary
-  git checkout -b "$branch" "$primary" 2>&1
+  # Determine base branch (Phase 13: default to roadmap)
+  local base_branch="roadmap"
+  
+  if [ "$force_from_develop" = "--from-develop" ]; then
+    # Emergency/hotfix mode: branch from develop
+    base_branch=$(detect_primary_branch)
+    echo "WARNING: EMERGENCY MODE - Branching from $base_branch instead of roadmap"
+  else
+    # Normal mode: ensure roadmap exists and use it
+    ensure_roadmap_branch >/dev/null
+    base_branch="roadmap"
+    
+    # Verify concept is on roadmap (Phase 13 requirement)
+    if ! is_on_roadmap "$name"; then
+      echo "WARNING: Concept '$name' is not on the roadmap branch"
+      echo "HINT: Concepts must be fully approved to appear on roadmap"
+      echo "      Use --from-develop for emergency bypass"
+    fi
+  fi
+  
+  # Ensure clean checkout
+  local clean_result=$(ensure_clean_checkout "$base_branch")
+  if [ $? -ne 0 ]; then
+    echo "$clean_result"
+    return 1
+  fi
+  
+  # Update base branch
+  git pull origin "$base_branch" 2>/dev/null || true
+  
+  # Create branch
+  git checkout -b "$branch" "$base_branch" 2>&1
   
   if [ $? -eq 0 ]; then
-    echo "OK: Created implementation branch $branch from $primary"
+    echo "OK: Created implementation branch $branch from $base_branch"
     return 0
   else
     echo "ERROR: Failed to create branch $branch"

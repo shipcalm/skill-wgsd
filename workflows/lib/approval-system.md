@@ -859,7 +859,7 @@ print('Use `/wgsd approve " + concept + " --fg <focus-group>` to approve.')
 
 ### approval_matrix_trigger_on_complete
 
-Called when concept becomes fully approved. Triggers Phase 13 integration.
+Called when concept becomes fully approved. Triggers Phase 13 roadmap merge.
 
 ```bash
 # Usage: approval_matrix_trigger_on_complete <concept_path>
@@ -867,6 +867,7 @@ approval_matrix_trigger_on_complete() {
   local concept_path="$1"
   local concept_name=$(basename "$concept_path")
   local fg_name=$(basename $(dirname $(dirname "$concept_path")))
+  local timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
   
   echo "=== APPROVAL COMPLETE: $concept_name ==="
   
@@ -879,7 +880,7 @@ approval_matrix_trigger_on_complete() {
   
   # 2. Create approved marker with timestamp
   cat > "$concept_path/.approved" <<EOF
-approved_at: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+approved_at: $timestamp
 concept: $concept_name
 focus_group: $fg_name
 EOF
@@ -892,11 +893,35 @@ EOF
     echo "✓ Added to implementation queue"
   fi
   
-  # 4. Output trigger for Phase 13 roadmap merge
+  # 4. Commit approval status
+  git add "$concept_path" 2>/dev/null
+  git commit -m "feat(${fg_name}): ${concept_name} fully approved" 2>/dev/null || true
+  
+  # 5. Phase 13: Trigger automatic merge to roadmap branch
   echo ""
-  echo "TRIGGER:roadmap_merge:$concept_name"
+  echo "📋 Triggering roadmap merge..."
+  echo ""
+  
+  # Execute merge-to-roadmap workflow
+  if [ -f "workflows/merge-to-roadmap.md" ]; then
+    # The workflow will handle the actual merge
+    echo "TRIGGER:roadmap_merge:$concept_name"
+    echo ""
+    echo "Run: /wgsd merge-to-roadmap $concept_name"
+  else
+    # Fallback: manual trigger output
+    echo "⚠️ merge-to-roadmap workflow not found"
+    echo "   Manual merge required:"
+    echo "   git checkout roadmap"
+    echo "   git merge concepts/${concept_name}"
+    echo "   git push origin roadmap"
+  fi
+  
+  # 6. Notify for canvas update
+  echo ""
   echo "TRIGGER:notify_channel:$concept_name:approved"
   echo "TRIGGER:canvas_update:$fg_name"
+  echo "TRIGGER:canvas_update:roadmap"
   
   return 0
 }

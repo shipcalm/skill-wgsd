@@ -43,11 +43,17 @@ What would you like to do?
 - **complete-implementation [name]** - Merge and clean up implementation
 
 **Canvas & Sync Commands:**
-- **create-canvas [type]** - Create canvas (master, implementation, focus-group, community, all)
-- **sync-canvas [target]** - Sync canvas from git state (all, fg, master, impl, community)
+- **create-canvas [type]** - Create canvas (master, implementation, focus-group, community, roadmap, all)
+- **sync-canvas [target]** - Sync canvas from git state (all, fg, master, impl, community, roadmap)
 - **canvas-check** - Check canvas integrity and detect drift
 - **canvas-restore [key]** - Restore canvas from git state
 - **roadmap** - Show cross-focus-group roadmap in main channel
+
+**Roadmap Branch Commands (Phase 13):**
+- **merge-to-roadmap [concept]** - Merge fully approved concept to roadmap branch
+- **roadmap-sync** - Sync roadmap branch to develop (forward sync)
+- **roadmap-sync --dry-run** - Preview sync changes without applying
+- **roadmap-sync --reverse** - Sync develop changes back to roadmap
 
 **Migration Commands:**
 - **migrate [repo-path]** - Full GSD to WGSD migration wizard
@@ -136,6 +142,8 @@ Based on user input, route to appropriate workflow:
 | "publish update", "progress update" | workflows/community-visibility.md |
 | "declare impact", "declare-impact", "impact" | workflows/declare-impact.md |
 | "update impact", "update-impact", "modify impact" | workflows/update-impact.md |
+| "merge to roadmap", "merge-to-roadmap", "roadmap merge" | workflows/merge-to-roadmap.md |
+| "roadmap sync", "roadmap-sync", "sync roadmap" | workflows/roadmap-sync.md |
 
 </routing>
 
@@ -191,9 +199,10 @@ WGSD creates shared planning structure:
 
 ## Git Integration
 
-**Branch Hierarchy (v2.2):**
+**Branch Hierarchy (v2.2 + Phase 13 Three-Tier Branching):**
 ```
 main/develop (primary)
+├── roadmap                        # ✨ Phase 13: Approved concepts backlog (PERMANENT)
 ├── concepts/                      # v2.2 concept branches (medium-lived)
 │   ├── byof-filesystem            # Independent concept development
 │   ├── auth-v2                    # Each concept gets its own branch
@@ -203,20 +212,33 @@ main/develop (primary)
 │   ├── onboarding                 # Concepts merge here after approval
 │   └── billing                    # Never merges to develop directly
 └── implementations/               # Implementation branches (short-lived)
-    ├── auth-v2-impl               # Code execution (off develop)
+    ├── auth-v2-impl               # ✨ Phase 13: Branches FROM roadmap
     └── billing-api-impl           # Merges back to develop (1-3 days)
 ```
 
-**Concept Branch Flow:**
+**Three-Tier Concept Flow (Phase 13):**
 ```
-concepts/{name}          ← Isolated concept development
+concepts/{name}          ← Concept development
     │
     ▼ (PR on team approval)
 focus-groups/{fg}        ← Focus group review
     │
-    ▼ (matrix approval - Phase 12)
-roadmap                  ← Ready for implementation
+    ▼ (full matrix approval)
+roadmap                  ← Approved backlog (auto-merge on completion)
+    │
+    ▼ (create-implementation)
+implementations/{name}   ← Code execution (branches FROM roadmap)
+    │
+    ▼ (merge)
+develop/main            ← Production code
 ```
+
+**Roadmap Branch (Phase 13):**
+- **Purpose:** Holds all fully approved concepts ready for implementation
+- **Created:** Automatically on `wgsd init`
+- **Merge In:** Concepts auto-merge when matrix approval completes
+- **Branch From:** Implementation branches start from roadmap
+- **Sync:** Periodically synced to develop via `wgsd roadmap-sync`
 
 **Worktrees:**
 ```
