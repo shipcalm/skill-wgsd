@@ -134,88 +134,140 @@ fi
 echo ""
 ```
 
-### Step 3: Analyze for Focus Group Suggestions
+### Step 3: Extract Concepts from Phases
 
 ```bash
 echo "─────────────────────────────────────────────────────────────"
-echo "📊 Step 2: Analyzing for Focus Group Suggestions"
+echo "📊 Step 2: Extracting Concepts from Phases"
 echo "─────────────────────────────────────────────────────────────"
 echo ""
 
+SUGGESTED_CONCEPTS=""
 SUGGESTED_FGS=""
+declare -A CONCEPT_TO_FG
 
-# Analyze roadmap
+# Helper: Determine focus group for a phase
+get_focus_group() {
+  local phase_lower="$1"
+  
+  if echo "$phase_lower" | grep -qE "foundation|infrastructure|core|setup|init"; then
+    echo "core"
+  elif echo "$phase_lower" | grep -qE "auth|security|permission|access|identity|login|password|session"; then
+    echo "security"
+  elif echo "$phase_lower" | grep -qE "api|integrat|endpoint|webhook|rest|graphql"; then
+    echo "api"
+  elif echo "$phase_lower" | grep -qE "ui|frontend|component|interface|ux|design|dashboard"; then
+    echo "frontend"
+  elif echo "$phase_lower" | grep -qE "migration|wizard|transition"; then
+    echo "migration"
+  elif echo "$phase_lower" | grep -qE "channel|slack|notification"; then
+    echo "channels"
+  elif echo "$phase_lower" | grep -qE "canvas|visual|display"; then
+    echo "visualization"
+  elif echo "$phase_lower" | grep -qE "workflow|process|automation"; then
+    echo "workflow"
+  elif echo "$phase_lower" | grep -qE "community|social|feedback"; then
+    echo "community"
+  else
+    echo "core"  # Default
+  fi
+}
+
+# Analyze roadmap - extract concepts from phases
 if [ -f ".planning/ROADMAP.md" ]; then
   echo "📄 Analyzing ROADMAP.md..."
+  echo ""
   
-  # Extract phase names and map to focus groups
+  # Extract phase names
   PHASES=$(grep -E "^##? Phase [0-9]+:" .planning/ROADMAP.md | head -10)
+  PHASE_COUNT=$(echo "$PHASES" | grep -c "Phase" || echo 0)
+  
+  echo "📝 Found $PHASE_COUNT phases → creating $PHASE_COUNT concepts:"
+  echo ""
   
   while IFS= read -r phase; do
     [ -z "$phase" ] && continue
     phase_lower=$(echo "$phase" | tr '[:upper:]' '[:lower:]')
     
-    if echo "$phase_lower" | grep -qE "foundation|infrastructure|core"; then
-      SUGGESTED_FGS="$SUGGESTED_FGS core"
-      echo "   📂 core ← $phase"
-    elif echo "$phase_lower" | grep -qE "auth|security|permission"; then
-      SUGGESTED_FGS="$SUGGESTED_FGS security"
-      echo "   📂 security ← $phase"
-    elif echo "$phase_lower" | grep -qE "api|integrat|endpoint"; then
-      SUGGESTED_FGS="$SUGGESTED_FGS api"
-      echo "   📂 api ← $phase"
-    elif echo "$phase_lower" | grep -qE "migration|wizard"; then
-      SUGGESTED_FGS="$SUGGESTED_FGS migration"
-      echo "   📂 migration ← $phase"
-    elif echo "$phase_lower" | grep -qE "channel|slack"; then
-      SUGGESTED_FGS="$SUGGESTED_FGS channels"
-      echo "   📂 channels ← $phase"
-    elif echo "$phase_lower" | grep -qE "canvas|dashboard|visual"; then
-      SUGGESTED_FGS="$SUGGESTED_FGS visualization"
-      echo "   📂 visualization ← $phase"
-    elif echo "$phase_lower" | grep -qE "workflow|process"; then
-      SUGGESTED_FGS="$SUGGESTED_FGS workflow"
-      echo "   📂 workflow ← $phase"
-    elif echo "$phase_lower" | grep -qE "community|social"; then
-      SUGGESTED_FGS="$SUGGESTED_FGS community"
-      echo "   📂 community ← $phase"
+    # Generate concept slug
+    concept_slug=$(echo "$phase" | \
+      sed 's/^##*[[:space:]]*//' | \
+      sed 's/^Phase[ -]*[0-9]*[: -]*//' | \
+      tr '[:upper:]' '[:lower:]' | \
+      tr ' ' '-' | \
+      tr -cd 'a-z0-9-' | \
+      sed 's/--*/-/g' | \
+      sed 's/^-//' | \
+      sed 's/-$//' | \
+      cut -c1-30)
+    
+    [ -z "$concept_slug" ] && concept_slug="phase-$(echo "$phase" | grep -oE '[0-9]+' | head -1)"
+    
+    # Assign to focus group
+    fg=$(get_focus_group "$phase_lower")
+    
+    SUGGESTED_CONCEPTS="$SUGGESTED_CONCEPTS $concept_slug"
+    CONCEPT_TO_FG[$concept_slug]="$fg"
+    
+    if ! echo "$SUGGESTED_FGS" | grep -q "$fg"; then
+      SUGGESTED_FGS="$SUGGESTED_FGS $fg"
     fi
+    
+    echo "   💡 $concept_slug → $fg ← $phase"
   done <<< "$PHASES"
   echo ""
 fi
 
-# Analyze codebase structure
+# Analyze codebase structure for additional focus groups
 echo "📁 Analyzing codebase structure..."
 
 [ -d "api" ] || [ -d "src/api" ] || [ -d "routes" ] && {
-  SUGGESTED_FGS="$SUGGESTED_FGS api"
-  echo "   📂 api ← Found api/ or routes/ directory"
+  if ! echo "$SUGGESTED_FGS" | grep -q "api"; then
+    SUGGESTED_FGS="$SUGGESTED_FGS api"
+    echo "   📂 api ← Found api/ or routes/ directory"
+  fi
 }
 
 [ -d "components" ] || [ -d "src/components" ] || [ -d "ui" ] && {
-  SUGGESTED_FGS="$SUGGESTED_FGS frontend"
-  echo "   📂 frontend ← Found components/ or ui/ directory"
+  if ! echo "$SUGGESTED_FGS" | grep -q "frontend"; then
+    SUGGESTED_FGS="$SUGGESTED_FGS frontend"
+    echo "   📂 frontend ← Found components/ or ui/ directory"
+  fi
 }
 
 [ -d "lib" ] || [ -d "src/lib" ] || [ -d "core" ] && {
-  SUGGESTED_FGS="$SUGGESTED_FGS core"
-  echo "   📂 core ← Found lib/ or core/ directory"
+  if ! echo "$SUGGESTED_FGS" | grep -q "core"; then
+    SUGGESTED_FGS="$SUGGESTED_FGS core"
+    echo "   📂 core ← Found lib/ or core/ directory"
+  fi
 }
 
 [ -d "workflows" ] || [ -d "agents" ] && {
-  SUGGESTED_FGS="$SUGGESTED_FGS ai"
-  echo "   📂 ai ← Found workflows/ or agents/ directory"
+  if ! echo "$SUGGESTED_FGS" | grep -q "ai"; then
+    SUGGESTED_FGS="$SUGGESTED_FGS ai"
+    echo "   📂 ai ← Found workflows/ or agents/ directory"
+  fi
 }
 
 echo ""
 
-# Deduplicate suggestions
+# Deduplicate
+UNIQUE_CONCEPTS=$(echo $SUGGESTED_CONCEPTS | tr ' ' '\n' | sort -u | tr '\n' ' ')
+CONCEPT_COUNT=$(echo $UNIQUE_CONCEPTS | wc -w | tr -d ' ')
 UNIQUE_FGS=$(echo $SUGGESTED_FGS | tr ' ' '\n' | sort -u | tr '\n' ' ')
 FG_COUNT=$(echo $UNIQUE_FGS | wc -w | tr -d ' ')
 
-echo "💡 Suggested Focus Groups ($FG_COUNT):"
+echo "📂 Suggested Focus Groups ($FG_COUNT) - thematic containers:"
 for fg in $UNIQUE_FGS; do
-  [ -n "$fg" ] && echo "   ✅ $fg"
+  # Count concepts in this focus group
+  fg_concepts=""
+  for concept in $UNIQUE_CONCEPTS; do
+    if [ "${CONCEPT_TO_FG[$concept]}" = "$fg" ]; then
+      fg_concepts="$fg_concepts $concept"
+    fi
+  done
+  fg_concept_count=$(echo $fg_concepts | wc -w | tr -d ' ')
+  [ -n "$fg" ] && echo "   ✅ $fg ($fg_concept_count concepts)"
 done
 echo ""
 ```
@@ -292,65 +344,130 @@ mkdir -p .planning/focus-groups
 mkdir -p .planning/active-implementations
 echo "✅ Created focus-groups/ directory"
 echo "✅ Created active-implementations/ directory"
+echo ""
 
-# Transform phases to focus groups if present
-if [ -d ".planning/phases" ]; then
-  echo ""
-  echo "📁 Transforming phases to focus groups..."
+# Create focus group directories with concepts subdirectory
+echo "📂 Creating focus group structure..."
+for fg in $UNIQUE_FGS; do
+  [ -z "$fg" ] && continue
+  fg_dir=".planning/focus-groups/$fg"
+  mkdir -p "$fg_dir/concepts"
   
-  for phase_dir in .planning/phases/*/; do
-    if [ -d "$phase_dir" ]; then
-      phase_name=$(basename "$phase_dir")
-      
-      # Map phase to focus group name
-      fg_name=$(echo "$phase_name" | \
-        sed 's/^phase-[0-9]*-//' | \
-        tr '-' ' ' | \
-        xargs)
-      
-      if [ -z "$fg_name" ]; then
-        fg_name="$phase_name"
-      fi
-      
-      fg_slug=$(echo "$fg_name" | \
-        tr '[:upper:]' '[:lower:]' | \
-        tr ' ' '-' | \
-        tr -cd 'a-z0-9-')
-      
-      fg_dir=".planning/focus-groups/$fg_slug"
-      mkdir -p "$fg_dir/concepts"
-      
-      # Copy phase contents
-      for file in "${phase_dir}"*; do
-        if [ -f "$file" ]; then
-          cp "$file" "$fg_dir/"
-        fi
-      done
-      
-      # Create focus group STATE.md
-      cat > "$fg_dir/STATE.md" << EOF
-# Focus Group: $fg_name
+  # Create focus group STATE.md
+  cat > "$fg_dir/STATE.md" << EOF
+# Focus Group: $fg
 
 **Status:** Active
 **Created:** $(date -I)
-**Migrated From:** phases/$phase_name
+**Channel:** #${STUB:-proj}-fg-$fg
 
 ## Description
 
-*Add focus group description here*
+*Thematic container for $fg-related concepts*
 
 ## Concepts
 
-*Concepts will be listed as they are created*
+$(for concept in $UNIQUE_CONCEPTS; do
+  if [ "${CONCEPT_TO_FG[$concept]}" = "$fg" ]; then
+    echo "- [$concept](concepts/$concept.md)"
+  fi
+done)
 
 ---
 
-*Migrated from GSD during WGSD migration*
+*Focus group created during WGSD migration*
 EOF
-      
-      echo "   ✅ $phase_name → focus-groups/$fg_slug"
-    fi
-  done
+  
+  echo "   ✅ focus-groups/$fg/"
+done
+echo ""
+
+# Create concept files from phases
+if [ -f ".planning/ROADMAP.md" ] && [ -n "$UNIQUE_CONCEPTS" ]; then
+  echo "📝 Creating concept files from phases..."
+  
+  # Parse ROADMAP.md to get phase content
+  PHASE_NUM=0
+  while IFS= read -r phase; do
+    [ -z "$phase" ] && continue
+    PHASE_NUM=$((PHASE_NUM + 1))
+    
+    # Generate concept slug
+    concept_slug=$(echo "$phase" | \
+      sed 's/^##*[[:space:]]*//' | \
+      sed 's/^Phase[ -]*[0-9]*[: -]*//' | \
+      tr '[:upper:]' '[:lower:]' | \
+      tr ' ' '-' | \
+      tr -cd 'a-z0-9-' | \
+      sed 's/--*/-/g' | \
+      sed 's/^-//' | \
+      sed 's/-$//' | \
+      cut -c1-30)
+    
+    [ -z "$concept_slug" ] && concept_slug="phase-$PHASE_NUM"
+    
+    # Get display title
+    display_title=$(echo "$phase" | \
+      sed 's/^##*[[:space:]]*//' | \
+      sed 's/^Phase[ -]*[0-9]*[: -]*//' | \
+      xargs)
+    
+    [ -z "$display_title" ] && display_title="Phase $PHASE_NUM"
+    
+    # Get assigned focus group
+    fg="${CONCEPT_TO_FG[$concept_slug]:-core}"
+    
+    # Create concept file
+    concept_file=".planning/focus-groups/$fg/concepts/$concept_slug.md"
+    
+    cat > "$concept_file" << EOF
+# Concept: $display_title
+
+**Status:** Migrated
+**Focus Group:** $fg
+**Source:** GSD Phase $PHASE_NUM
+**Migrated:** $(date -I)
+
+---
+
+## Description
+
+*Scope and description from Phase $PHASE_NUM*
+
+---
+
+## Acceptance Criteria
+
+*Requirements from Phase $PHASE_NUM - to be refined*
+
+---
+
+## Implementation Notes
+
+*To be populated during concept development*
+
+---
+
+## Discussion History
+
+*Future discussions from #${STUB:-proj}-fg-$fg will be linked here*
+
+---
+
+*Concept migrated from GSD Phase $PHASE_NUM during WGSD migration*
+EOF
+    
+    echo "   💡 $concept_slug.md → focus-groups/$fg/concepts/"
+  done <<< "$(grep -E "^##? Phase [0-9]+:" .planning/ROADMAP.md | head -10)"
+  echo ""
+fi
+
+# Legacy support: Handle existing phases directory
+if [ -d ".planning/phases" ]; then
+  echo "📁 Note: Found existing .planning/phases/ directory"
+  echo "   Phase content has been transformed to concepts above."
+  echo "   Original phases preserved for reference."
+  echo ""
 fi
 
 echo ""
@@ -425,12 +542,28 @@ cat > .planning/WGSD-CONFIG.md << EOF
 
 ---
 
+## Concepts (Migrated from GSD Phases)
+
+| Concept | Source | Focus Group |
+|---------|--------|-------------|
+$(PHASE_IDX=0; for concept in $UNIQUE_CONCEPTS; do
+  PHASE_IDX=$((PHASE_IDX + 1))
+  fg="${CONCEPT_TO_FG[$concept]:-core}"
+  [ -n "$concept" ] && echo "| $concept | Phase $PHASE_IDX | $fg |"
+done)
+
+---
+
 ## Focus Groups
 
-| Name | Status | Channel |
-|------|--------|---------|
+| Name | Status | Concepts | Channel |
+|------|--------|----------|---------|
 $(for fg in $UNIQUE_FGS; do
-  [ -n "$fg" ] && echo "| $fg | Active | #${STUB}-fg-${fg} |"
+  fg_concept_count=0
+  for concept in $UNIQUE_CONCEPTS; do
+    [ "${CONCEPT_TO_FG[$concept]}" = "$fg" ] && fg_concept_count=$((fg_concept_count + 1))
+  done
+  [ -n "$fg" ] && echo "| $fg | Active | $fg_concept_count | #${STUB}-fg-${fg} |"
 done)
 
 ---
@@ -614,9 +747,16 @@ Hey team! We've upgraded our development workflow from GSD to **WGSD (We Get Shi
 
 ## What Changed
 
-- **Focus Groups** replace phases for ongoing discussions
-- **Concepts** are ideas we develop socially before coding
-- **Implementations** are short-lived coding sprints (1-3 days)
+- **Phases → Concepts** - Each GSD phase is now a "Concept" (a focused deliverable)
+- **Focus Groups** - Thematic containers that organize related concepts (security, api, etc.)
+- **Implementations** - Short-lived coding sprints (1-3 days) to build concepts
+
+## Migration Summary
+
+| GSD | → | WGSD |
+|-----|---|------|
+| $CONCEPT_COUNT Phases | → | $CONCEPT_COUNT Concepts |
+| — | → | $FG_COUNT Focus Groups |
 
 ## New Channels
 
@@ -628,10 +768,21 @@ $(for fg in $UNIQUE_FGS; do
 done)
 $([ "$WIP_PRESERVED" = "true" ] && echo "| #${IMPL_NAME} | Active implementation |")
 
+## Concept Locations
+
+Your GSD phases have been converted to concept files:
+$(for fg in $UNIQUE_FGS; do
+  concepts_in_fg=""
+  for concept in $UNIQUE_CONCEPTS; do
+    [ "${CONCEPT_TO_FG[$concept]}" = "$fg" ] && concepts_in_fg="$concepts_in_fg $concept"
+  done
+  [ -n "$(echo $concepts_in_fg | xargs)" ] && echo "- \`.planning/focus-groups/$fg/concepts/\`: $(echo $concepts_in_fg | xargs | tr ' ' ', ')"
+done)
+
 ## How to Contribute
 
 1. **Have an idea?** Share it in the relevant focus group channel
-2. **Want to build something?** Create a concept for discussion
+2. **Want to build something?** Create or refine a concept
 3. **Ready to code?** Promote your concept to an implementation
 
 ## Questions?
@@ -647,7 +798,7 @@ echo "✅ Created team announcement: $ANNOUNCEMENT_FILE"
 echo ""
 echo "📋 Preview:"
 echo "─────────────────────────────────────────────────────────────"
-head -25 "$ANNOUNCEMENT_FILE"
+head -30 "$ANNOUNCEMENT_FILE"
 echo "..."
 echo "─────────────────────────────────────────────────────────────"
 echo ""
@@ -666,10 +817,17 @@ git commit -m "feat: migrate from GSD to WGSD v2.0
 
 - Created WGSD directory structure
 - Generated WGSD-CONFIG.md
-- Created focus groups: $UNIQUE_FGS
+- Created $CONCEPT_COUNT concepts from GSD phases
+- Organized into $FG_COUNT focus groups: $UNIQUE_FGS
 - Updated PROJECT.md and STATE.md
 - Created MASTER-ROADMAP.md
 - Generated team announcement
+
+Phase → Concept mapping:
+$(for concept in $UNIQUE_CONCEPTS; do
+  fg="${CONCEPT_TO_FG[$concept]:-core}"
+  [ -n "$concept" ] && echo "  - $concept → $fg"
+done)
 
 Migration backup: ${BACKUP_DIR:-"none"}"
 
@@ -694,21 +852,32 @@ echo "════════════════════════�
 echo ""
 echo "📁 Project: $PROJECT_NAME"
 echo "📱 Slack Stub: $STUB"
-echo "📂 Focus Groups: $FG_COUNT"
+echo "📝 Concepts Created: $CONCEPT_COUNT (from GSD phases)"
+echo "📂 Focus Groups: $FG_COUNT (thematic containers)"
 $([ "$WIP_PRESERVED" = "true" ] && echo "📦 WIP Preserved: $IMPL_NAME")
 echo ""
 echo "📋 New Structure:"
 echo "   .planning/"
-echo "   ├── WGSD-CONFIG.md      ✅"
-echo "   ├── MASTER-ROADMAP.md   ✅"
-echo "   ├── focus-groups/       ✅"
+echo "   ├── WGSD-CONFIG.md           ✅"
+echo "   ├── MASTER-ROADMAP.md        ✅"
+echo "   ├── focus-groups/            ✅"
+$(for fg in $UNIQUE_FGS; do
+  [ -n "$fg" ] && echo "   │   └── $fg/concepts/       ✅"
+done)
 echo "   └── active-implementations/  ✅"
+echo ""
+echo "📝 Concept → Focus Group Mapping:"
+$(for concept in $UNIQUE_CONCEPTS; do
+  fg="${CONCEPT_TO_FG[$concept]:-core}"
+  [ -n "$concept" ] && echo "   💡 $concept → $fg"
+done)
 echo ""
 echo "📝 Next Steps:"
 echo "   1. Create Slack channel: #${STUB}-dev"
 echo "   2. Post announcement from: .planning/MIGRATION-ANNOUNCEMENT.md"
-echo "   3. Create focus group channels"
-echo "   4. Run: wgsd status"
+echo "   3. Create focus group channels: #${STUB}-fg-*"
+echo "   4. Review concepts in focus-groups/*/concepts/"
+echo "   5. Run: wgsd status"
 echo ""
 if [ -n "$BACKUP_DIR" ]; then
   echo "📦 Backup preserved at: $BACKUP_DIR"

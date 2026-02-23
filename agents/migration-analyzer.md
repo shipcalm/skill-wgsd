@@ -24,11 +24,11 @@ Analyze a GSD project to:
 
 ### 1. Roadmap Analysis
 
-Extract focus group suggestions from GSD roadmap phases:
+Extract concepts from GSD roadmap phases and cluster into focus groups:
 
 ```bash
 # Usage: analyze_roadmap <path_to_roadmap>
-# Returns: Suggested focus groups with rationale
+# Returns: Concepts extracted from phases + suggested focus group clusters
 analyze_roadmap() {
   local roadmap_file="$1"
   
@@ -37,58 +37,127 @@ analyze_roadmap() {
     return 1
   fi
   
-  echo "📊 Analyzing Roadmap: $roadmap_file"
+  echo "📊 Extracting Concepts from Phases: $roadmap_file"
   echo ""
   
   # Extract phase names
   local phases=$(grep -E "^##? Phase [0-9]+:|^##? [0-9]+\." "$roadmap_file" | head -10)
   
-  # Map phases to focus groups
-  local suggested_fgs=""
+  # Extract concepts from phases and assign to focus groups
+  local suggested_concepts=""
+  local fg_core="" fg_security="" fg_api="" fg_frontend="" fg_data="" 
+  local fg_migration="" fg_workflow="" fg_community="" fg_visualization="" fg_channels=""
   
   while IFS= read -r phase; do
+    [ -z "$phase" ] && continue
     local phase_lower=$(echo "$phase" | tr '[:upper:]' '[:lower:]')
     local fg=""
     
-    # Foundation/Infrastructure → core
+    # Generate concept slug from phase title
+    local concept_slug=$(echo "$phase" | \
+      sed 's/^##*[[:space:]]*//' | \
+      sed 's/^Phase[ -]*[0-9]*[: -]*//' | \
+      tr '[:upper:]' '[:lower:]' | \
+      tr ' ' '-' | \
+      tr -cd 'a-z0-9-' | \
+      sed 's/--*/-/g' | \
+      sed 's/^-//' | \
+      sed 's/-$//' | \
+      cut -c1-30)
+    
+    [ -z "$concept_slug" ] && concept_slug="phase-$(echo "$phase" | grep -oE '[0-9]+' | head -1)"
+    
+    # Determine focus group domain
     if echo "$phase_lower" | grep -qE "foundation|infrastructure|core|setup|init"; then
       fg="core"
-    # Auth/Security → security
-    elif echo "$phase_lower" | grep -qE "auth|security|permission|access|identity"; then
+      fg_core="$fg_core $concept_slug"
+    elif echo "$phase_lower" | grep -qE "auth|security|permission|access|identity|login|password|session"; then
       fg="security"
-    # API/Integration → api
+      fg_security="$fg_security $concept_slug"
     elif echo "$phase_lower" | grep -qE "api|integration|endpoint|webhook|rest|graphql"; then
       fg="api"
-    # UI/Frontend → frontend
-    elif echo "$phase_lower" | grep -qE "ui|frontend|component|interface|ux|design"; then
+      fg_api="$fg_api $concept_slug"
+    elif echo "$phase_lower" | grep -qE "ui|frontend|component|interface|ux|design|dashboard"; then
       fg="frontend"
-    # Data/Database → data  
-    elif echo "$phase_lower" | grep -qE "data|database|migration|schema|model|storage"; then
+      fg_frontend="$fg_frontend $concept_slug"
+    elif echo "$phase_lower" | grep -qE "data|database|schema|model|storage"; then
       fg="data"
-    # Migration → migration (keep separate)
+      fg_data="$fg_data $concept_slug"
     elif echo "$phase_lower" | grep -qE "migration|wizard|transition|convert"; then
       fg="migration"
-    # Workflow/Process → workflow
+      fg_migration="$fg_migration $concept_slug"
     elif echo "$phase_lower" | grep -qE "workflow|process|automation|pipeline"; then
       fg="workflow"
-    # Community/Social → community
-    elif echo "$phase_lower" | grep -qE "community|social|feedback|user"; then
+      fg_workflow="$fg_workflow $concept_slug"
+    elif echo "$phase_lower" | grep -qE "community|social|feedback"; then
       fg="community"
-    # Canvas/Dashboard → visualization
-    elif echo "$phase_lower" | grep -qE "canvas|dashboard|visualization|display"; then
+      fg_community="$fg_community $concept_slug"
+    elif echo "$phase_lower" | grep -qE "canvas|visualization|display"; then
       fg="visualization"
-    # Channel/Communication → channels
+      fg_visualization="$fg_visualization $concept_slug"
     elif echo "$phase_lower" | grep -qE "channel|slack|notification|messaging"; then
       fg="channels"
+      fg_channels="$fg_channels $concept_slug"
+    else
+      fg="core"  # Default to core
+      fg_core="$fg_core $concept_slug"
     fi
     
-    if [ -n "$fg" ] && ! echo "$suggested_fgs" | grep -q "$fg"; then
-      suggested_fgs="$suggested_fgs $fg"
-      echo "   📂 $fg ← $phase"
-    fi
+    suggested_concepts="$suggested_concepts $concept_slug"
+    echo "   💡 $concept_slug → $fg ← $phase"
   done <<< "$phases"
   
   echo ""
+  
+  # Build focus groups from concept clusters
+  local suggested_fgs=""
+  local fg_details=""
+  
+  [ -n "$(echo $fg_core | xargs)" ] && { 
+    suggested_fgs="$suggested_fgs core"
+    fg_details="$fg_details\n   📂 core: $(echo $fg_core | xargs | tr ' ' ', ')"
+  }
+  [ -n "$(echo $fg_security | xargs)" ] && {
+    suggested_fgs="$suggested_fgs security"
+    fg_details="$fg_details\n   📂 security: $(echo $fg_security | xargs | tr ' ' ', ')"
+  }
+  [ -n "$(echo $fg_api | xargs)" ] && {
+    suggested_fgs="$suggested_fgs api"
+    fg_details="$fg_details\n   📂 api: $(echo $fg_api | xargs | tr ' ' ', ')"
+  }
+  [ -n "$(echo $fg_frontend | xargs)" ] && {
+    suggested_fgs="$suggested_fgs frontend"
+    fg_details="$fg_details\n   📂 frontend: $(echo $fg_frontend | xargs | tr ' ' ', ')"
+  }
+  [ -n "$(echo $fg_data | xargs)" ] && {
+    suggested_fgs="$suggested_fgs data"
+    fg_details="$fg_details\n   📂 data: $(echo $fg_data | xargs | tr ' ' ', ')"
+  }
+  [ -n "$(echo $fg_migration | xargs)" ] && {
+    suggested_fgs="$suggested_fgs migration"
+    fg_details="$fg_details\n   📂 migration: $(echo $fg_migration | xargs | tr ' ' ', ')"
+  }
+  [ -n "$(echo $fg_workflow | xargs)" ] && {
+    suggested_fgs="$suggested_fgs workflow"
+    fg_details="$fg_details\n   📂 workflow: $(echo $fg_workflow | xargs | tr ' ' ', ')"
+  }
+  [ -n "$(echo $fg_community | xargs)" ] && {
+    suggested_fgs="$suggested_fgs community"
+    fg_details="$fg_details\n   📂 community: $(echo $fg_community | xargs | tr ' ' ', ')"
+  }
+  [ -n "$(echo $fg_visualization | xargs)" ] && {
+    suggested_fgs="$suggested_fgs visualization"
+    fg_details="$fg_details\n   📂 visualization: $(echo $fg_visualization | xargs | tr ' ' ', ')"
+  }
+  [ -n "$(echo $fg_channels | xargs)" ] && {
+    suggested_fgs="$suggested_fgs channels"
+    fg_details="$fg_details\n   📂 channels: $(echo $fg_channels | xargs | tr ' ' ', ')"
+  }
+  
+  echo "📂 Focus Group Clusters:"
+  echo -e "$fg_details"
+  echo ""
+  echo "SUGGESTED_CONCEPTS:$(echo $suggested_concepts)"
   echo "SUGGESTED_FOCUS_GROUPS:$(echo $suggested_fgs)"
   return 0
 }
@@ -244,11 +313,11 @@ analyze_requirements() {
 
 ### 4. Combined Analysis
 
-Merge all suggestions with deduplication and prioritization:
+Merge all suggestions with concept extraction and focus group clustering:
 
 ```bash
 # Usage: full_analysis <repo_path>
-# Returns: Complete migration analysis with recommendations
+# Returns: Complete migration analysis with concepts and focus group recommendations
 full_analysis() {
   local repo_path="${1:-.}"
   local planning_dir="$repo_path/.planning"
@@ -261,15 +330,18 @@ full_analysis() {
   echo "📅 Date: $(date -I)"
   echo ""
   
-  # Collect all suggestions
+  # Collect concepts and focus groups
+  local all_concepts=""
   local all_fgs=""
   
-  # Roadmap analysis
+  # Roadmap analysis - extract concepts from phases
   if [ -f "$planning_dir/ROADMAP.md" ]; then
     echo "─────────────────────────────────────────────────────────"
     roadmap_result=$(analyze_roadmap "$planning_dir/ROADMAP.md")
     echo "$roadmap_result"
+    roadmap_concepts=$(echo "$roadmap_result" | grep "SUGGESTED_CONCEPTS:" | cut -d: -f2)
     roadmap_fgs=$(echo "$roadmap_result" | grep "SUGGESTED_FOCUS_GROUPS:" | cut -d: -f2)
+    all_concepts="$all_concepts $roadmap_concepts"
     all_fgs="$all_fgs $roadmap_fgs"
     echo ""
   fi
@@ -292,14 +364,25 @@ full_analysis() {
   all_fgs="$all_fgs $code_fgs"
   echo ""
   
-  # Deduplicate and sort
+  # Deduplicate concepts and focus groups
+  local unique_concepts=$(echo $all_concepts | tr ' ' '\n' | sort -u | tr '\n' ' ')
+  local concept_count=$(echo $unique_concepts | wc -w | tr -d ' ')
   local unique_fgs=$(echo $all_fgs | tr ' ' '\n' | sort -u | tr '\n' ' ')
   local fg_count=$(echo $unique_fgs | wc -w | tr -d ' ')
   
   echo "─────────────────────────────────────────────────────────"
   echo "📊 Analysis Summary"
   echo ""
-  echo "Recommended Focus Groups ($fg_count):"
+  
+  if [ "$concept_count" -gt 0 ]; then
+    echo "📝 Suggested Concepts ($concept_count) - from GSD Phases:"
+    for concept in $unique_concepts; do
+      [ -n "$concept" ] && echo "   💡 $concept"
+    done
+    echo ""
+  fi
+  
+  echo "📂 Recommended Focus Groups ($fg_count) - thematic containers:"
   for fg in $unique_fgs; do
     [ -n "$fg" ] && echo "   ✅ $fg"
   done
@@ -313,8 +396,8 @@ full_analysis() {
   echo ""
   echo "The migration wizard will:"
   echo "   1. Create WGSD workspace structure"
-  echo "   2. Set up focus groups: $unique_fgs"
-  echo "   3. Transform planning artifacts"
+  echo "   2. Create $concept_count concepts from GSD phases"
+  echo "   3. Organize concepts into $fg_count focus groups"
   echo "   4. Preserve any work-in-progress"
   echo "   5. Generate team announcement"
   echo ""
@@ -323,7 +406,9 @@ full_analysis() {
   # Export for use by migration workflow
   echo ""
   echo "ANALYSIS_RESULT:"
-  echo "  focus_groups: [$unique_fgs]"
+  echo "  suggested_concepts: [$unique_concepts]"
+  echo "  concept_count: $concept_count"
+  echo "  suggested_focus_groups: [$unique_fgs]"
   echo "  focus_group_count: $fg_count"
   echo "  has_roadmap: $([ -f "$planning_dir/ROADMAP.md" ] && echo true || echo false)"
   echo "  has_requirements: $([ -f "$planning_dir/REQUIREMENTS.md" ] && echo true || echo false)"
@@ -403,11 +488,18 @@ I've analyzed your GSD project and have some recommendations.
 - Status: In Progress (75% complete)
 - Uncommitted Changes: 3 files
 
-**Recommended Focus Groups:**
-1. ✅ **core** - Foundation infrastructure
-2. ✅ **security** - Authentication & authorization
-3. ✅ **api** - API endpoints (from codebase)
-4. ✅ **frontend** - UI components (from codebase)
+**Suggested Concepts (from GSD Phases):**
+1. 💡 **foundation-setup** ← Phase 1
+2. 💡 **security-implementation** ← Phase 2 (current)
+3. 💡 **api-development** ← Phase 3
+
+**Recommended Focus Groups (thematic containers):**
+1. 📂 **core** (1 concept: foundation-setup)
+2. 📂 **security** (1 concept: security-implementation)
+3. 📂 **api** (1 concept: api-development)
+
+**Note:** Each GSD Phase becomes a Concept within a Focus Group.
+Focus Groups are organizational containers (2-4 typical), not 1:1 with phases.
 
 **Work-in-Progress:**
 Your current phase has uncommitted work. I recommend:
@@ -415,9 +507,9 @@ Your current phase has uncommitted work. I recommend:
 - This preserves your progress as an active implementation
 
 **Next Steps:**
-1. Review the focus group suggestions above
+1. Review the concept and focus group suggestions above
 2. Run `wgsd migrate` to start the wizard
-3. The wizard will guide you through each step
+3. The wizard will create concept files in appropriate focus groups
 
 Would you like to proceed with the migration?
 ```

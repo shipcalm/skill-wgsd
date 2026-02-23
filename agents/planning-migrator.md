@@ -43,6 +43,152 @@ Analyze requirements and documentation to detect natural domain groupings:
 
 ## Analysis Process
 
+### Step 0: Phase-to-Concept Transformation
+
+Transform GSD phases into WGSD concepts:
+
+```bash
+# Usage: transform_phase_to_concept <phase_title> <phase_content> <focus_group>
+# Returns: Concept file content
+transform_phase_to_concept() {
+  local phase_title="$1"
+  local phase_content="$2"
+  local focus_group="$3"
+  local source_phase="$4"  # e.g., "Phase 1"
+  
+  # Generate concept slug
+  local concept_slug=$(echo "$phase_title" | \
+    sed 's/^Phase[ -]*[0-9]*[: -]*//' | \
+    tr '[:upper:]' '[:lower:]' | \
+    tr ' ' '-' | \
+    tr -cd 'a-z0-9-' | \
+    sed 's/--*/-/g' | \
+    sed 's/^-//' | \
+    sed 's/-$//' | \
+    cut -c1-30)
+  
+  local display_title=$(echo "$phase_title" | sed 's/^Phase[ -]*[0-9]*[: -]*//' | xargs)
+  
+  cat << EOF
+# Concept: $display_title
+
+**Status:** Migrated
+**Focus Group:** $focus_group
+**Source:** GSD $source_phase
+**Migrated:** $(date -I)
+
+---
+
+## Description
+
+$phase_content
+
+---
+
+## Acceptance Criteria
+
+*Imported from phase requirements - to be refined*
+
+---
+
+## Implementation Notes
+
+*To be populated during concept development*
+
+---
+
+## Discussion History
+
+*Future discussions from #stub-fg-$focus_group will be linked here*
+
+---
+
+*Concept migrated from GSD $source_phase during WGSD migration*
+EOF
+}
+
+# Usage: parse_roadmap_phases <roadmap_file>
+# Returns: Phase details for concept creation
+parse_roadmap_phases() {
+  local roadmap_file="$1"
+  
+  if [ ! -f "$roadmap_file" ]; then
+    echo "NO_ROADMAP"
+    return 1
+  fi
+  
+  # Parse phases with their content
+  awk '
+    /^##? Phase [0-9]+:/ {
+      if (phase_title) {
+        print phase_title "|" phase_content
+      }
+      phase_title = $0
+      phase_content = ""
+      next
+    }
+    /^##? [0-9]+\./ {
+      if (phase_title) {
+        print phase_title "|" phase_content
+      }
+      phase_title = $0
+      phase_content = ""
+      next
+    }
+    /^##? Phase/ { next }
+    /^##?[^#]/ {
+      if (phase_title) {
+        print phase_title "|" phase_content
+      }
+      phase_title = ""
+      phase_content = ""
+      next
+    }
+    phase_title && !/^[[:space:]]*$/ {
+      phase_content = phase_content " " $0
+    }
+    END {
+      if (phase_title) {
+        print phase_title "|" phase_content
+      }
+    }
+  ' "$roadmap_file"
+}
+
+# Assign concept to focus group based on content analysis
+assign_concept_to_focus_group() {
+  local concept_title="$1"
+  local concept_content="$2"
+  local combined=$(echo "$concept_title $concept_content" | tr '[:upper:]' '[:lower:]')
+  
+  if echo "$combined" | grep -qE "foundation|infrastructure|core|setup|init|scaffold"; then
+    echo "core"
+  elif echo "$combined" | grep -qE "auth|security|permission|access|identity|login|password|session|token"; then
+    echo "security"
+  elif echo "$combined" | grep -qE "api|endpoint|integrat|webhook|rest|graphql"; then
+    echo "api"
+  elif echo "$combined" | grep -qE "ui|frontend|component|interface|ux|design|dashboard|react|vue"; then
+    echo "frontend"
+  elif echo "$combined" | grep -qE "data|database|schema|model|storage|query"; then
+    echo "data"
+  elif echo "$combined" | grep -qE "migration|wizard|transition|convert"; then
+    echo "migration"
+  elif echo "$combined" | grep -qE "workflow|process|automation|pipeline"; then
+    echo "workflow"
+  elif echo "$combined" | grep -qE "community|social|feedback"; then
+    echo "community"
+  elif echo "$combined" | grep -qE "canvas|visualization|display|chart"; then
+    echo "visualization"
+  elif echo "$combined" | grep -qE "channel|slack|notification|messaging"; then
+    echo "channels"
+  else
+    echo "core"  # Default fallback
+  fi
+}
+```
+
+---
+
 ### Step 1: Read and Parse REQUIREMENTS.md
 
 ```bash
@@ -113,8 +259,47 @@ For each detected domain, create:
 
 ### Step 4: Create Concept Files
 
-Transform requirements into concept files:
+Transform phases and requirements into concept files:
 
+**For Phases → Concepts:**
+```markdown
+# Concept: {Phase Title (without number)}
+
+**Status:** Migrated
+**Focus Group:** {assigned-domain}
+**Source:** GSD Phase {N}
+**Migrated:** {date}
+
+---
+
+## Description
+
+{Phase description and scope}
+
+---
+
+## Acceptance Criteria
+
+{Phase requirements/goals as checklist}
+
+---
+
+## Implementation Notes
+
+*To be populated during concept development*
+
+---
+
+## Discussion History
+
+*Links to focus group discussions will appear here*
+
+---
+
+*Concept migrated from GSD Phase {N}*
+```
+
+**For Requirements → Concepts:**
 ```markdown
 # Concept: {Requirement Title}
 
@@ -199,24 +384,29 @@ Detected 24 requirements across 5 domains:
 When invoked to perform migration:
 
 ```
-🔄 Migrating REQUIREMENTS.md to Focus Groups...
+🔄 Migrating GSD Project to WGSD...
 
-✅ Created focus-groups/security/
-   └── 6 concepts created
+📝 Phase → Concept Transformation:
+   💡 foundation-setup.md ← Phase 1: Foundation Setup → core
+   💡 authentication-system.md ← Phase 2: Authentication → security
+   💡 api-development.md ← Phase 3: API Development → api
+   💡 dashboard-ui.md ← Phase 4: Dashboard UI → frontend
 
-✅ Created focus-groups/api/
-   └── 5 concepts created
+📂 Focus Group Structure:
+   ✅ focus-groups/core/concepts/
+      └── foundation-setup.md
+   ✅ focus-groups/security/concepts/
+      └── authentication-system.md
+   ✅ focus-groups/api/concepts/
+      └── api-development.md
+   ✅ focus-groups/frontend/concepts/
+      └── dashboard-ui.md
 
-✅ Created focus-groups/frontend/
-   └── 5 concepts created
+📋 Requirements → Concepts (if REQUIREMENTS.md exists):
+   ✅ focus-groups/security/concepts/
+      └── 6 requirement concepts
 
-✅ Created focus-groups/billing/
-   └── 5 concepts created
-
-✅ Created focus-groups/general/
-   └── 3 concepts created
-
-📦 Total: 24 concepts across 5 focus groups
+📦 Total: 4 phase concepts + 6 requirement concepts across 4 focus groups
 ```
 
 ---
