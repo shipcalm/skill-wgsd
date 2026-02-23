@@ -9,7 +9,7 @@
 
 **Phase:** Not started (defining requirements)  
 **Status:** Milestone v2.1 initialized  
-**Last Activity:** 2026-02-23 — v2.0 archived, v2.1 milestone started
+**Last Activity:** 2026-02-23 — Phase 7 planning complete
 
 ---
 
@@ -29,9 +29,9 @@
 
 | Phase | Name | Status | Requirements | Progress |
 |-------|------|--------|--------------|----------|
-| 7 | Migration Logic Fix | ⏳ Planned | 3 | 0% |
-| 8 | Slack Channel Automation | ⏳ Planned | 4 | 0% |
-| 9 | Approval Workflow | ⏳ Planned | 4 | 0% |
+| 7 | Migration Logic Fix | ✅ **Planned** | 3 | 0% (ready) |
+| 8 | Slack Channel Automation | ⏳ Pending | 4 | 0% |
+| 9 | Approval Workflow | ⏳ Pending | 4 | 0% |
 
 ---
 
@@ -74,13 +74,19 @@ None identified.
 
 ## Next Actions
 
-1. **Plan Phase 7** — Migration Logic Fix
-2. Begin systematic execution through phases 7-9
+1. ✅ **Phase 7 Planned** — Migration Logic Fix (see `.planning/phases/phase-07/`)
+2. **Execute Phase 7** — Implement the 3 requirements
+3. Plan and execute phases 8-9
 
-**To begin:**
+**To execute Phase 7:**
 ```
-/gsd plan-phase 7
+/gsd build-phase 7
 ```
+
+**Phase 7 Planning Artifacts:**
+- `phases/phase-07/RESEARCH.md` — Problem analysis and industry patterns
+- `phases/phase-07/PLAN.md` — Detailed execution plan with 3 waves
+- `phases/phase-07/VERIFICATION.md` — Test scenarios and acceptance criteria
 
 ---
 
