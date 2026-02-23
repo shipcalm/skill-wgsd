@@ -413,3 +413,73 @@ Begin with Phase 10: Concept Directory Architecture as the foundation for all su
 ---
 
 *Roadmap for WGSD v2.2 — Matrix-Based Social Development Architecture*
+
+---
+
+## Phase 17: Migration Auto-Channel Creation
+
+**Dependencies:** None (bug fix)  
+**Estimated Effort:** 3-5 hours  
+**Priority:** High (bug fix)  
+**Status:** 🔵 Planned  
+
+### Problem
+
+WGSD migration workflow currently requires manual Slack channel creation after migration completes. This breaks the "one-step migration" promise and creates friction for teams adopting WGSD.
+
+### Requirements
+
+| ID | Requirement | Priority |
+|----|-------------|----------|
+| REQ-17-01 | Automatic dev channel creation during migration | Must Have |
+| REQ-17-02 | Automatic focus group channel creation | Must Have |
+| REQ-17-03 | Automatic implementation channel creation | Must Have |
+| REQ-17-04 | Automatic team member invitation | Should Have |
+| REQ-17-05 | Graceful error handling for channel failures | Must Have |
+
+### Success Criteria
+
+Migration workflow automatically creates all required Slack channels and invites team members without manual intervention.
+
+### Implementation Notes
+
+- **Target:** `workflows/migrate.md` Step 11 (after commit)
+- **Integration:** Use existing `create-channel.md` workflow  
+- **Error Handling:** Warn on failures but don't abort migration
+- **Testing:** Verify with fresh Slack workspace
+
+---
+
+## Phase 18: Migration Auto-Canvas Creation
+
+**Dependencies:** Phase 17 (channels must exist first)  
+**Estimated Effort:** 4-6 hours  
+**Priority:** High (missing feature)  
+**Status:** 🔵 Planned  
+
+### Problem
+
+WGSD migration workflow does not create essential roadmap canvases, leaving the visual collaboration aspect unavailable until manual setup. This defeats the purpose of "complete workflow migration."
+
+### Requirements
+
+| ID | Requirement | Priority |
+|----|-------------|----------|
+| REQ-18-01 | Automatic master dashboard creation | Must Have |
+| REQ-18-02 | Automatic focus group canvas creation | Must Have |
+| REQ-18-03 | Automatic implementation canvas creation | Should Have |
+| REQ-18-04 | Canvas registry initialization | Must Have |
+| REQ-18-05 | Dynamic content population from .planning/ | Must Have |
+| REQ-18-06 | Graceful canvas failure handling (non-fatal) | Must Have |
+
+### Success Criteria
+
+Migration workflow automatically creates and populates all essential roadmap canvases, making WGSD visual collaboration immediately available.
+
+### Implementation Notes
+
+- **Target:** `workflows/migrate.md` Step 12 (after channels)
+- **Integration:** Use existing `canvas-create.md` workflows
+- **Content:** Populate from current `.planning/` roadmap data
+- **Error Handling:** Non-fatal failures with manual fallback documentation
+

@@ -36,7 +36,9 @@ Transform from single focus group ownership to cross-cutting concept approval ma
 | 14 | Slack-Native Approval Workflow | ✅ Complete | 5 | 100% |
 | 15 | Canvas Developer Info | ⬜ Pending | 3 | 0% |
 | 16 | Emergency Hotfix Bypass | ⬜ Pending | 3 | 0% |
-| | **v2.2 TOTAL** | 🟢 **IN PROGRESS** | **31** | **81%** |
+| 17 | Migration Auto-Channel Creation | ⬜ Pending | 5 | 0% |
+| 18 | Migration Auto-Canvas Creation | ⬜ Pending | 6 | 0% |
+| | **v2.2 TOTAL** | 🟢 **IN PROGRESS** | **42** | **60%** |
 
 ---
 
