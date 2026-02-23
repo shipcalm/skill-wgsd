@@ -7,9 +7,9 @@
 
 ## Current Position
 
-**Phase:** Phase 8 Complete  
-**Status:** Milestone v2.1 in progress (2/3 phases done)  
-**Last Activity:** 2026-02-23 — Phase 8 executed (Slack automation)
+**Phase:** Phase 9 Planned (FINAL)  
+**Status:** Milestone v2.1 in progress — all phases planned, 2/3 executed  
+**Last Activity:** 2026-02-23 — Phase 9 planned (Approval Workflow)
 
 ---
 
@@ -21,7 +21,7 @@
 **User Feedback Issues:**
 1. ✅ Phase → Focus Group mapping (FIXED: Phase → Concept)
 2. ✅ No Slack channel auto-creation during migration (FIXED: Phase 8)
-3. ❌ No preview/approval step before migration execution
+3. 📋 No preview/approval step before migration execution (PLANNED: Phase 9)
 
 ---
 
@@ -31,7 +31,7 @@
 |-------|------|--------|--------------|----------|
 | 7 | Migration Logic Fix | ✅ **Complete** | 3 | 100% |
 | 8 | Slack Channel Automation | ✅ **Complete** | 4 | 100% |
-| 9 | Approval Workflow | ⏳ Pending | 4 | 0% |
+| 9 | Approval Workflow | 📋 **Planned** | 4 | 0% |
 
 ---
 
@@ -77,7 +77,8 @@ None identified.
 
 1. ✅ **Phase 7 Complete** — Migration Logic Fix (commit 14f06b9)
 2. ✅ **Phase 8 Complete** — Slack Channel Automation (commit 03d4e97)
-3. **Plan & Execute Phase 9** — Approval Workflow → Complete v2.1
+3. 📋 **Phase 9 Planned** — Approval Workflow (ready for execution)
+4. **Execute Phase 9** → Complete v2.1
 
 **Phase 7 Completion Summary:**
 - Wave 1: Updated migration-analyzer.md (concepts extraction, domain clustering)
@@ -95,6 +96,24 @@ None identified.
 - Idempotent channel creation (detects existing channels)
 - Rate limiting (1s delay between API calls)
 - Full channel registry in WGSD-CONFIG.md
+
+**Phase 9 Plan Summary (FINAL PHASE):**
+- Wave 1: Consolidate analysis phase — collect all data before execution
+- Wave 2: Generate preview — formatted display of migration plan
+- Wave 3: Approval loop — yes/no/edit workflow with modification support
+- Wave 4: Update execution — only create approved items
+
+**Phase 9 Key Features:**
+- Comprehensive preview (focus groups, concepts, channels, files)
+- Explicit `yes` to proceed (Terraform-style)
+- Clean `no` cancellation with cleanup
+- Edit mode for modifications (rename FG, move concepts, exclude items)
+- Real-time preview updates after edits
+
+**Phase 9 Artifacts:**
+- `phases/phase-09/RESEARCH.md` — Approval UX patterns research
+- `phases/phase-09/PLAN.md` — Detailed 4-wave execution plan
+- `phases/phase-09/VERIFICATION.md` — Test scenarios and checklists
 
 **Phase 8 Artifacts:**
 - `phases/phase-08/RESEARCH.md` — Existing workflow analysis and integration strategy
