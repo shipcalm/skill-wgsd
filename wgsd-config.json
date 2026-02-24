@@ -1,0 +1,24 @@
+{
+  "channel_mappings": {
+    "C0AH913BEPJ": {
+      "channel_name": "#wgsd",
+      "working_directory": "github/skill-wgsd",
+      "description": "WGSD skill development - maps to skill-wgsd repository",
+      "auto_cd": true,
+      "git_integration": true
+    }
+  },
+  "workspace_config": {
+    "base_directory": "/home/jarvis/.openclaw/workspace",
+    "auto_detection": true,
+    "git_worktree_mapping": true
+  },
+  "agent_mappings": {
+    "U0ABX540Z27": {
+      "agent_name": "jarvis",
+      "default_working_directories": [
+        "github/skill-wgsd"
+      ]
+    }
+  }
+}

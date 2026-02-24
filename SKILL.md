@@ -73,6 +73,11 @@ What would you like to do?
 - **setup-repo [repo-path]** - Initialize WGSD structure in repository
 - **create-channel [name] [topic]** - Create Slack channel via exec tool and API
 
+**Channel Mapping Commands:**
+- **apply-channel-mapping** - Set working directory based on current Slack channel
+- **map-channel [channel] [directory]** - Configure channel-to-directory mapping
+- **show-mappings** - Display all configured channel mappings
+
 **Workflow Engine Commands:**
 - **concept-development [concept]** - Work on concept via planning PRs
 - **implementation-workflow [impl] [action]** - Manage implementation lifecycle
@@ -157,6 +162,9 @@ Based on user input, route to appropriate workflow:
 | "reject", "block" | workflows/conversational-reject.md |
 | "status", "approval-status", "show-approvals", "matrix" | workflows/concept-status.md |
 | "request-review", "re-review" | workflows/conversational-reject.md |
+| "apply channel mapping", "apply-channel-mapping", "map directory" | workflows/apply-channel-mapping.md |
+| "map channel", "map-channel", "configure mapping" | workflows/apply-channel-mapping.md |
+| "show mappings", "show-mappings", "list mappings" | workflows/apply-channel-mapping.md |
 
 </routing>
 
